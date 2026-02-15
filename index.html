@@ -16,32 +16,14 @@ button{ width:100%; padding:1rem; border:none; border-radius:12px; font-weight:b
 .btn-wait{background:#111827;color:#555;border:1px solid #333;cursor:not-allowed;}
 input,select{ width:100%; padding:12px; margin-bottom:10px; border-radius:10px; background:#111827; color:white; border:1px solid #333; box-sizing: border-box; font-size: 1rem;}
 
-/* SEAMLESS DRAGGING STYLES */
 #rank-list { position: relative; margin: 1.5rem 0; display: flex; flex-direction: column; gap: 10px; }
 .rank-item { 
-    background:#334155; 
-    padding:16px; 
-    border-radius:14px; 
-    cursor:grab; 
-    touch-action:none; 
-    text-align: left;
-    user-select: none;
-    border: 1px solid rgba(255,255,255,0.05);
-    display: flex;
-    align-items: center;
+    background:#334155; padding:16px; border-radius:14px; cursor:grab; touch-action:none; text-align: left;
+    user-select: none; border: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center;
     transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s;
 }
 .rank-item::before { content: "☰"; margin-right: 12px; opacity: 0.3; font-size: 0.8rem; }
-.rank-item.active { 
-    transform: scale(1.04); 
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
-    background: #475569;
-    cursor: grabbing; 
-    z-index: 100;
-    opacity: 0.9;
-    transition: none; /* No transition while following finger */
-}
-.sortable-ghost { opacity: 0; }
+.rank-item.active { transform: scale(1.04); box-shadow: 0 10px 30px rgba(0,0,0,0.5); background: #475569; cursor: grabbing; z-index: 100; opacity: 0.9; transition: none; }
 .role-badge { font-size: 0.75rem; text-transform: uppercase; font-weight: 900; letter-spacing: 1.5px; margin-bottom: 8px; }
 </style>
 </head>
@@ -95,6 +77,7 @@ input,select{ width:100%; padding:12px; margin-bottom:10px; border-radius:10px; 
 </div>
 
 <script>
+// Logic & Questions
 const bank = {
     romance: [
         {q:"Ideal First Date?",opts:["Fine Dining","Quiet Coffee","Gaming Arcade","Sunset Picnic","Movie Night"]},
@@ -131,23 +114,40 @@ function startJoin(){
     peer = new Peer();
     role = "guest";
     peer.on("open", () => {
-        conn = peer.connect(document.getElementById("join-id").value);
+        const val = document.getElementById("join-id").value;
+        if(!val) return alert("Enter a code!");
+        conn = peer.connect(val);
         setup();
     });
 }
 
 function setup(){
     conn.on("open", () => {
-        document.getElementById("status").innerText = "Connected";
+        document.getElementById("status").innerText = "Handshaking...";
         if(role === "guest") conn.send({type: "READY"});
     });
     conn.on("data", d => {
-        if(d.type === "READY" && role === "host") { conn.send({type: "INIT", mode, max}); sync(); }
-        if(d.type === "INIT") { mode = d.mode; max = d.max; show("screen-game"); }
-        if(d.type === "SYNC") { idx = d.s.idx; truth = d.s.truth; time = d.s.time; show("screen-game"); round(); }
+        if(d.type === "READY" && role === "host") {
+            conn.send({type: "INIT", mode, max});
+            sync();
+        }
+        if(d.type === "INIT") {
+            mode = d.mode; max = d.max;
+            document.getElementById("status").innerText = "Connected";
+            show("screen-game");
+            round();
+        }
+        if(d.type === "SYNC") {
+            idx = d.s.idx; truth = d.s.truth; time = d.s.time;
+            show("screen-game");
+            round();
+        }
         if(d.type === "TRUTH") { truth = d.order; ui(); }
         if(d.type === "GUESS") { reveal(truth, d.order); }
-        if(d.type === "NEXT") { idx = d.i; if(idx >= max) final(); else round(); }
+        if(d.type === "NEXT") {
+            idx = d.i;
+            if(idx >= max) final(); else round();
+        }
     });
 }
 
@@ -206,8 +206,8 @@ function startTimer(){
     }, 1000);
 }
 
-// ULTRA-SEAMLESS DRAG LOGIC
-let active = null, startY = 0, initialMouseY = 0;
+// Drag Logic
+let active = null, startY = 0;
 const list = document.getElementById("rank-list");
 
 list.addEventListener("pointerdown", e => {
@@ -215,33 +215,20 @@ list.addEventListener("pointerdown", e => {
     const item = e.target.closest(".rank-item");
     if(!item) return;
     active = item;
-    initialMouseY = e.clientY;
     const rect = active.getBoundingClientRect();
-    startY = initialMouseY - rect.top;
-    
+    startY = e.clientY - rect.top;
     active.classList.add("active");
     active.setPointerCapture(e.pointerId);
 });
 
 list.addEventListener("pointermove", e => {
     if(!active) return;
-    
-    const currentY = e.clientY - startY;
     const listRect = list.getBoundingClientRect();
     const constrainedY = Math.max(0, Math.min(e.clientY - listRect.top - startY, listRect.height - active.offsetHeight));
-    
     active.style.transform = `translateY(${constrainedY - active.offsetTop}px)`;
-
     const siblings = [...list.querySelectorAll(".rank-item:not(.active)")];
-    const nextSibling = siblings.find(sibling => {
-        return e.clientY <= sibling.getBoundingClientRect().top + sibling.getBoundingClientRect().height / 2;
-    });
-
-    if (nextSibling !== active.nextSibling) {
-        list.insertBefore(active, nextSibling || null);
-        // Trigger small vibration on mobile if supported
-        if(window.navigator.vibrate) window.navigator.vibrate(5);
-    }
+    const nextSibling = siblings.find(sibling => e.clientY <= sibling.getBoundingClientRect().top + sibling.getBoundingClientRect().height / 2);
+    if (nextSibling !== active.nextSibling) list.insertBefore(active, nextSibling || null);
 });
 
 list.addEventListener("pointerup", e => {
@@ -256,9 +243,7 @@ function render(opts){
     list.innerHTML = "";
     [...opts].sort(() => Math.random() - .5).forEach(t => {
         const d = document.createElement("div");
-        d.className = "rank-item";
-        d.innerText = t;
-        list.appendChild(d);
+        d.className = "rank-item"; d.innerText = t; list.appendChild(d);
     });
 }
 </script>

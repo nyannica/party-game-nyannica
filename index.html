@@ -8,9 +8,10 @@
     <style>
         :root { --p1:#6366f1; --p2:#ec4899; --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --success:#22c55e; --near:#eab308; }
         body { margin:0; font-family:system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); display:flex; justify-content:center; align-items:center; min-height:100vh; padding:1rem; overflow:hidden; touch-action: none; }
-        .container { max-width:480px; width:100%; background:var(--card); padding:1.5rem; border-radius:24px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.3); max-height:95vh; overflow-y:auto; }
+        .container { max-width:480px; width:100%; background:var(--card); padding:1.5rem; border-radius:24px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.3); max-height:95vh; overflow-y:auto; position: relative; }
         .hidden { display:none !important; }
         button { width:100%; padding:1.1rem; border:none; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:8px; transition:0.2s; font-size:1rem; color:white; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-main { background:var(--p1); }
         .btn-alt { background:var(--p2); }
         .btn-outline { background:#334155; border:1px solid #475569; }
@@ -22,6 +23,7 @@
         .rank-preview { opacity: 0.4; cursor: default; pointer-events: none; border: 1px dashed #475569; }
         #live-points { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-around; font-weight: bold; border: 1px solid #475569; font-size: 0.8rem; }
         .result-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+        #steal-timer { font-size: 0.7rem; margin-top: 5px; color: var(--p2); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -71,6 +73,7 @@
         <h2 id="res-score">Result</h2>
         <div id="result-list" style="margin: 15px 0;"></div>
         <div id="controls"></div>
+        <div id="steal-timer"></div>
     </div>
 </div>
 
@@ -80,17 +83,22 @@ const bank = {
         {q:"Best RPG Class?",opts:["Warrior","Mage","Rogue","Healer","Archer"]},
         {q:"Gaming Platform?",opts:["High-end PC","PlayStation","Xbox","Switch","Mobile"]},
         {q:"Worst Level?",opts:["Water Level","Escort Mission","Sewer","Tutorial","Ice/Slippery"]},
-        {q:"Satisfaction?",opts:["Boss Kill","Rare Loot","Level Up","Discovery","Story Ending"]}
+        {q:"Satisfaction?",opts:["Boss Kill","Rare Loot","Level Up","Discovery","Story Ending"]},
+        {q:"Genre?",opts:["Open World","FPS","Survival","Puzzle","Horror"]}
     ],
     personal: [
         {q:"Social Battery?",opts:["Introvert","Extrovert","Selective","Ambivert","Homebody"]},
-        {q:"Decision Style?",opts:["Logic","Emotion","Coin Flip","Ask Others","Gut Feeling"]}
+        {q:"Decision Style?",opts:["Logic","Emotion","Coin Flip","Ask Others","Gut Feeling"]},
+        {q:"Superpower?",opts:["Flight","Invisibility","Time Travel","Mind Reading","Teleport"]}
     ],
-    // Infrastructure ready for 500 questions
+    travel: [{q:"Destiny?",opts:["Beach","Mountain","City","Ruins","Forest"]}],
+    career: [{q:"Value?",opts:["Salary","Balance","Impact","Security","Freedom"]}],
+    romance: [{q:"Date?",opts:["Dinner","Arcade","Cinema","Picnic","Coffee"]}]
 };
 
 let peer, conn, role, idx=0, max=10, mode="gaming", truth=null, locked=false;
 let scores = { host: 0, guest: 0 }, deck = [], currentDesigner="host";
+let stealInterval;
 
 function show(id) { 
     document.querySelectorAll(".container > div:not(#status):not(#live-points)").forEach(d => d.classList.add("hidden")); 
@@ -124,7 +132,11 @@ function setup() {
         if(d.type === "GUESS") { reveal(truth, d.order); }
         if(d.type === "NEXT") { idx = d.i; (idx >= max) ? location.reload() : round(); }
         if(d.type === "SYNC_SCORE") { scores = d.scores; updatePoints(); }
-        if(d.type === "STEAL") { currentDesigner = (role === "host") ? "guest" : "host"; replay(); }
+        if(d.type === "STEAL") { 
+            clearInterval(stealInterval);
+            currentDesigner = (role === "host") ? "guest" : "host"; 
+            replay(); 
+        }
     });
 }
 
@@ -143,11 +155,8 @@ function replay() {
     locked = false; 
     document.getElementById("question").innerText = deck[idx].q;
     document.getElementById("round-info").innerText = `Round ${idx + 1} of ${max}`;
-    
-    // If you are the guesser, you see the options but can't move them yet (preview mode)
     const isGuesserWaiting = (role !== currentDesigner && !truth);
     render(deck[idx].opts, isGuesserWaiting);
-    
     ui(); show("screen-game");
 }
 
@@ -177,6 +186,7 @@ function sendOrder() {
 }
 
 function reveal(t, g) {
+    clearInterval(stealInterval);
     const list = document.getElementById("result-list"); list.innerHTML = ""; 
     let pts = 0;
     t.forEach((x, i) => {
@@ -186,16 +196,48 @@ function reveal(t, g) {
         div.innerHTML = `<span>${x}</span><span style="color:${diff===0?'var(--success)':'var(--text)'}">Rank #${actualPos+1}</span>`;
         list.appendChild(div);
     });
-    if(role === "host") { scores[(currentDesigner==='host'?'guest':'host')] += pts; conn.send({ type: "SYNC_SCORE", scores }); updatePoints(); }
+    
+    if(role === "host") { 
+        scores[(currentDesigner==='host'?'guest':'host')] += pts; 
+        conn.send({ type: "SYNC_SCORE", scores }); 
+        updatePoints(); 
+    }
     
     const ctrl = document.getElementById("controls"); ctrl.innerHTML = "";
+    const timerDisplay = document.getElementById("steal-timer");
+    timerDisplay.innerText = "";
+
     if(role !== currentDesigner) {
-        let b = document.createElement("button"); b.className="btn-alt"; b.innerText="My Turn for this Q";
-        b.onclick = () => { conn.send({type:"STEAL"}); currentDesigner=role; replay(); }; ctrl.appendChild(b);
+        let timeLeft = 5;
+        let b = document.createElement("button"); 
+        b.className="btn-alt"; b.id="btn-steal-action";
+        b.innerText=`🔄 Steal Turn (${timeLeft}s)`;
+        b.onclick = () => { conn.send({type:"STEAL"}); currentDesigner=role; replay(); };
+        ctrl.appendChild(b);
+
+        stealInterval = setInterval(() => {
+            timeLeft--;
+            if(timeLeft > 0) {
+                b.innerText = `🔄 Steal Turn (${timeLeft}s)`;
+            } else {
+                b.disabled = true;
+                b.innerText = "Time Expired";
+                clearInterval(stealInterval);
+            }
+        }, 1000);
     }
+
     if(role === "host") {
-        let b = document.createElement("button"); b.className="btn-main"; b.innerText=(idx+1 >= max) ? "Final Scoreboard" : "Next Round";
-        b.onclick = () => { idx++; conn.send({type:"NEXT", i:idx}); (idx >= max) ? alert("Game Over!") : round(); }; ctrl.appendChild(b);
+        let bNext = document.createElement("button"); 
+        bNext.className="btn-main"; 
+        bNext.innerText=(idx+1 >= max) ? "Final Scoreboard" : "Next Round";
+        bNext.onclick = () => { 
+            clearInterval(stealInterval);
+            idx++; 
+            conn.send({type:"NEXT", i:idx}); 
+            (idx >= max) ? location.reload() : round(); 
+        };
+        ctrl.appendChild(bNext);
     }
     show("screen-results");
 }

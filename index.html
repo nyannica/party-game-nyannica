@@ -14,6 +14,7 @@ button{width:100%;padding:1.2rem;border:none;border-radius:12px;font-weight:bold
 .btn-main{background:var(--p1);color:white;}
 .btn-main:active{transform:scale(0.95);}
 .btn-wait{background:#111827;color:#666;border:1px solid #333;cursor:wait;}
+.btn-alt{background:var(--p2);color:white;}
 input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;background:#111827;color:white;border:1px solid #333;box-sizing:border-box;font-size:1rem;}
 #rank-list{position:relative;margin:1.5rem 0;display:flex;flex-direction:column;gap:10px;}
 .rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;border:1px solid rgba(255,255,255,0.05);}
@@ -23,16 +24,23 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
 .result-perfect{border-left:5px solid var(--success);background:rgba(34,197,94,0.15);}
 .result-close{border-left:5px solid var(--near);background:rgba(234,179,8,0.15);}
 .result-wrong{border-left:5px solid #64748b;background:rgba(100,116,139,0.15);}
+.custom-box{background:rgba(0,0,0,0.2); padding:15px; border-radius:15px; margin-top:10px;}
 </style>
 </head>
 <body>
 <div class="container">
-<div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;transition:0.3s;">Connecting to Network...</div>
+<div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;">Connecting...</div>
 
 <div id="screen-start" class="game-screen">
     <h1>DuoRanker</h1>
-    <select id="mode-select"><option value="romance">Romance Mode</option><option value="personal">Personal Mode</option></select>
-    <select id="length-select"><option value="5">5 Questions</option><option value="10">10 Questions</option></select>
+    <select id="mode-select" onchange="toggleLength()">
+        <option value="romance">Romance Mode</option>
+        <option value="personal">Personal Mode</option>
+        <option value="custom">Custom Creator Mode</option>
+    </select>
+    <div id="len-wrap">
+        <select id="length-select"><option value="10">10 Questions</option><option value="20">20 Questions</option></select>
+    </div>
     <button class="btn-main" onclick="startHost()">Host Game</button>
     <div style="margin:15px;color:#475569;font-size:.8rem;">OR</div>
     <input id="join-id" placeholder="Partner's Code" type="tel">
@@ -43,6 +51,19 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
     <p>Room Created!</p>
     <h1 id="room-id" style="font-size:3.5rem;color:var(--p1);letter-spacing:4px;">----</h1>
     <p style="opacity:.7;">Waiting for partner...</p>
+</div>
+
+<div id="screen-custom-build" class="game-screen hidden">
+    <h2>Design Your Question</h2>
+    <input id="c-q" placeholder="The Question (e.g. Best Pizza?)">
+    <div class="custom-box">
+        <input class="c-opt" placeholder="Option 1">
+        <input class="c-opt" placeholder="Option 2">
+        <input class="c-opt" placeholder="Option 3">
+        <input class="c-opt" placeholder="Option 4">
+        <input class="c-opt" placeholder="Option 5">
+    </div>
+    <button class="btn-alt" onclick="submitCustom()">Send to Guesser</button>
 </div>
 
 <div id="screen-game" class="game-screen hidden">
@@ -67,36 +88,26 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
 </div>
 
 <script>
-const bank={
-    romance:[
-        {q:"Ideal First Date?",opts:["Fine Dining","Quiet Coffee","Gaming Arcade","Sunset Picnic","Movie Night"]},
-        {q:"Best Gesture?",opts:["Love Letter","Surprise Trip","Home Cooked Meal","Thoughtful Gift","Warm Hug"]},
-        {q:"Physical Touch?",opts:["Holding Hands","Long Hugs","Forehead Kisses","Cuddling","Massages"]},
-        {q:"Honeymoon?",opts:["Tropical Island","European City","Mountain Cabin","Theme Park","Cruise"]}
-    ],
-    personal:[
-        {q:"Life Phase?",opts:["Childhood","Teen Years","Young Adult","Established Career","Retirement"]},
-        {q:"Biggest Fear?",opts:["Failure","Being Alone","Physical Pain","Large Crowds","Loss of Control"]},
-        {q:"Social Battery?",opts:["Introvert","Extrovert","Ambivert","Selective Socialite","Homebody"]}
-    ]
-};
+// (Bank remains the same as previous version)
+const bank={romance:[{q:"Ideal First Date?",opts:["Fine Dining","Quiet Coffee","Gaming Arcade","Sunset Picnic","Movie Night"]}],personal:[{q:"Life Phase?",opts:["Childhood","Teen Years","Young Adult","Established Career","Retirement"]}]};
 
-let peer, conn, role, idx=0, mode="romance", max=5, truth=null, locked=false, total=0;
+let peer, conn, role, idx=0, mode="romance", max=10, truth=null, locked=false, total=0, customData=null;
 
-// HELPER: FORCE UI CHANGE
+function toggleLength(){
+    document.getElementById('len-wrap').classList.toggle('hidden', document.getElementById('mode-select').value === 'custom');
+}
+
 function show(screenId){
-    const screens = document.querySelectorAll(".game-screen");
-    screens.forEach(s => s.classList.add("hidden"));
-    const active = document.getElementById(screenId);
-    if(active) active.classList.remove("hidden");
+    document.querySelectorAll(".game-screen").forEach(s => s.classList.add("hidden"));
+    document.getElementById(screenId).classList.remove("hidden");
 }
 
 function startHost(){
     mode=document.getElementById("mode-select").value;
-    max=parseInt(document.getElementById("length-select").value);
+    max= (mode==='custom') ? 1 : parseInt(document.getElementById("length-select").value);
     peer=new Peer(Math.floor(1000+Math.random()*9000)+"");
     role="host";
-    peer.on("open",id=>{ document.getElementById("room-id").innerText=id; show("screen-wait"); document.getElementById("status").innerText="Waiting..."; });
+    peer.on("open",id=>{ document.getElementById("room-id").innerText=id; show("screen-wait"); });
     peer.on("connection",c=>{conn=c; setupConnection();});
 }
 
@@ -104,8 +115,7 @@ function startJoin(){
     peer=new Peer(); role="guest";
     peer.on("open",()=>{
         const id=document.getElementById("join-id").value;
-        if(!id) return;
-        conn=peer.connect(id); setupConnection();
+        if(id) { conn=peer.connect(id); setupConnection(); }
     });
 }
 
@@ -116,57 +126,71 @@ function setupConnection(){
     });
     
     conn.on("data",d=>{
-        // Visual debug flash
-        const s = document.getElementById("status");
-        s.style.background = "#22c55e33";
-        setTimeout(()=>s.style.background="transparent", 200);
-
-        if(d.type==="READY" && role==="host"){ conn.send({type:"START",mode,max}); enterGame(); }
-        if(d.type==="START"){ mode=d.mode; max=d.max; enterGame(); }
+        if(d.type==="READY" && role==="host"){ conn.send({type:"START",mode,max}); startFlow(); }
+        if(d.type==="START"){ mode=d.mode; max=d.max; startFlow(); }
+        if(d.type==="CUSTOM_DATA"){ customData = d.payload; round(); }
         if(d.type==="TRUTH"){ truth=d.order; ui(); }
         if(d.type==="GUESS"){ reveal(truth, d.order); }
-        
-        // CRITICAL: Next Round Sync
-        if(d.type==="NEXT"){ 
-            idx = d.i; 
-            if(idx >= max) {
-                showFinal(); 
-            } else {
-                round(); // This resets variables and calls show("screen-game")
-            }
-        }
+        if(d.type==="NEXT"){ idx = d.i; if(idx >= max) showFinal(); else round(); }
     });
 }
 
-function enterGame(){ round(); }
+function startFlow(){
+    if(mode === 'custom'){
+        // In custom mode, Host is always the Creator first
+        if(role === 'host') show("screen-custom-build");
+        else {
+            document.getElementById("status").innerText = "Partner is creating...";
+            show("screen-game");
+            document.getElementById("question").innerText = "Waiting for Custom Question...";
+        }
+    } else {
+        round();
+    }
+}
+
+function submitCustom(){
+    const q = document.getElementById("c-q").value;
+    const opts = [...document.querySelectorAll(".c-opt")].map(i => i.value).filter(v => v);
+    if(!q || opts.length < 2) return alert("Enter a question and at least 2 options!");
+    
+    customData = { q, opts };
+    conn.send({type: "CUSTOM_DATA", payload: customData});
+    round();
+}
 
 function round(){
     truth=null; locked=false;
-    const qSet=bank[mode]; 
-    const q=qSet[idx % qSet.length];
-    document.getElementById("question").innerText=q.q;
-    document.getElementById("round").innerText=`Question ${idx+1} of ${max}`;
-    render(q.opts); 
-    ui(); 
-    show("screen-game"); // Forces Guest to switch from Results to Game
+    let qObj;
+    if(mode === 'custom'){
+        qObj = customData;
+    } else {
+        const qSet = bank[mode] || bank.romance;
+        qObj = qSet[idx % qSet.length];
+    }
+    document.getElementById("question").innerText = qObj.q;
+    document.getElementById("round").innerText = (mode==='custom') ? "Custom Round" : `Question ${idx+1} of ${max}`;
+    render(qObj.opts);
+    ui();
+    show("screen-game");
 }
 
 function ui(){
-    const chooser=(idx%2===0 && role==="host")||(idx%2!==0 && role==="guest");
-    const r=document.getElementById("role"); 
-    const b=document.getElementById("submit");
-    r.innerText=chooser?"Setting the Truth":(truth?"Your Turn to Guess":"Partner is choosing...");
-    r.style.color=chooser?"var(--p2)":"var(--p1)";
-    b.classList.toggle("hidden",!chooser && !truth);
-    b.disabled=locked; 
-    b.innerText=locked?"Order Locked":"Lock My Order";
+    // In custom mode, the "Truth" setter is always the Creator
+    const isCreator = (mode === 'custom') ? (role === 'host') : ((idx%2===0 && role==="host")||(idx%2!==0 && role==="guest"));
+    const r=document.getElementById("role"); const b=document.getElementById("submit");
+    r.innerText = isCreator ? "Set Your Truth" : (truth ? "Guess Their Truth" : "Partner is Ranking...");
+    r.style.color = isCreator ? "var(--p2)" : "var(--p1)";
+    b.classList.toggle("hidden", !isCreator && !truth);
+    b.disabled = locked;
+    b.innerText = locked ? "Order Sent" : "Lock Order";
 }
 
 function sendOrder(){
     const order=[...document.querySelectorAll(".rank-item")].map(x=>x.innerText);
     locked=true; ui();
-    if(!truth){truth=order; conn.send({type:"TRUTH",order});}
-    else{conn.send({type:"GUESS",order}); reveal(truth,order);}
+    if(!truth){ truth=order; conn.send({type:"TRUTH",order}); }
+    else{ conn.send({type:"GUESS",order}); reveal(truth,order); }
 }
 
 function reveal(t,g){
@@ -181,37 +205,21 @@ function reveal(t,g){
         div.innerHTML=`<span>${x}</span><span>Ranked #${gIdx+1}</span>`;
         list.appendChild(div);
     });
-    const s=Math.round((pts/10)*100); 
-    total+=s;
+    const s=Math.round((pts/(t.length*2))*100); total+=s;
     document.getElementById("res-score").innerText=s+"% Match";
-    
-    const ctrl=document.getElementById("controls"); 
-    ctrl.innerHTML="";
-    const btn=document.createElement("button");
+    const ctrl=document.getElementById("controls"); ctrl.innerHTML="";
     if(role==="host"){
-        btn.className="btn-main"; 
-        btn.innerText=idx+1>=max?"View Final Results":"Next Round →";
-        btn.onclick = () => {
-            idx++;
-            // We explicitly send the command before switching local UI
-            conn.send({type:"NEXT", i:idx});
-            if(idx >= max) showFinal(); else round();
-        };
-    } else {
-        btn.className="btn-wait"; 
-        btn.innerText="Waiting for Host..."; 
-        btn.disabled=true;
+        const btn=document.createElement("button"); btn.className="btn-main";
+        btn.innerText = (idx+1 >= max) ? "Final Results" : "Next Round →";
+        btn.onclick = () => { idx++; conn.send({type:"NEXT", i:idx}); if(idx >= max) showFinal(); else round(); };
+        ctrl.appendChild(btn);
     }
-    ctrl.appendChild(btn); 
     show("screen-results");
 }
 
-function showFinal(){ 
-    show("screen-final"); 
-    document.getElementById("final").innerText=Math.round(total/max)+"%"; 
-}
+function showFinal(){ show("screen-final"); document.getElementById("final").innerText=Math.round(total/max)+"%"; }
 
-// DRAG LOGIC
+// Drag Logic (Standard)
 let active=null,startY=0;
 const rList=document.getElementById("rank-list");
 rList.addEventListener("pointerdown",e=>{

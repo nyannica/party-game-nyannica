@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DuoRanker - Synced Multiplayer</title>
+<title>DuoRanker - Smooth Swipe Multiplayer</title>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <style>
@@ -49,13 +49,17 @@ margin-bottom:10px;
 padding:1rem;
 border-radius:14px;
 cursor:grab;
-display:flex;
-align-items:center;
-text-align:left;
 font-size:.95rem;
+touch-action:none;
+transition:transform .15s ease, box-shadow .15s ease;
 }
 
-.rank-item.dragging{opacity:.4;}
+.rank-item.active{
+cursor:grabbing;
+transform:scale(1.05);
+box-shadow:0 10px 25px rgba(0,0,0,.4);
+z-index:1000;
+}
 
 button{
 width:100%;
@@ -232,7 +236,13 @@ maxRounds=d.maxRounds;
 }
 
 if(d.type==="SYNC"){
-Object.assign(window,d.state);
+currentIdx=d.state.currentIdx;
+mode=d.state.mode;
+maxRounds=d.state.maxRounds;
+truth=d.state.truth;
+paused=d.state.paused;
+timeLeft=d.state.timeLeft;
+
 startRound();
 startTimer();
 }
@@ -426,37 +436,68 @@ if(!locked)sendOrder();
 },1000);
 }
 
-/* ---------- DRAG SORT ---------- */
+/* ---------- SMOOTH SWIPE SORT ---------- */
+
+let activeItem=null;
+let startY=0;
+
+const list=document.getElementById("rank-list");
+
+list.addEventListener("pointerdown",e=>{
+if(locked)return;
+
+const item=e.target.closest(".rank-item");
+if(!item)return;
+
+activeItem=item;
+startY=e.clientY;
+item.classList.add("active");
+item.setPointerCapture(e.pointerId);
+});
+
+list.addEventListener("pointermove",e=>{
+if(!activeItem||locked)return;
+
+const delta=e.clientY-startY;
+activeItem.style.transform=`translateY(${delta}px) scale(1.05)`;
+
+const siblings=[...document.querySelectorAll(".rank-item:not(.active)")];
+
+for(let sib of siblings){
+const box=sib.getBoundingClientRect();
+const mid=box.top+box.height/2;
+
+if(e.clientY<mid){
+sib.parentNode.insertBefore(activeItem,sib);
+break;
+}
+
+if(sib===siblings[siblings.length-1]){
+sib.parentNode.appendChild(activeItem);
+}
+}
+});
+
+list.addEventListener("pointerup",e=>{
+if(!activeItem)return;
+
+activeItem.classList.remove("active");
+activeItem.style.transform="";
+activeItem.releasePointerCapture(e.pointerId);
+activeItem=null;
+});
+
+/* ---------- RENDER ---------- */
 
 function renderList(opts){
-const list=document.getElementById("rank-list");
 list.innerHTML="";
-
 opts.sort(()=>Math.random()-.5).forEach(t=>{
 const li=document.createElement("div");
 li.className="rank-item fade-in";
-li.draggable=true;
 li.innerText=t;
-
-li.addEventListener("dragstart",()=>!locked&&li.classList.add("dragging"));
-li.addEventListener("dragend",()=>li.classList.remove("dragging"));
-
 list.appendChild(li);
 });
 }
-
-document.getElementById("rank-list").addEventListener("dragover",e=>{
-if(locked)return;
-e.preventDefault();
-
-const dragging=document.querySelector(".dragging");
-const list=document.getElementById("rank-list");
-
-const after=[...list.querySelectorAll(".rank-item:not(.dragging)")]
-.find(el=>e.clientY<=el.getBoundingClientRect().top+el.height/2);
-
-list.insertBefore(dragging,after||null);
-});
 
 /* ---------- UI HELPERS ---------- */
 

@@ -3,26 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peer Ranker - No Setup Required</title>
+    <title>DuoRanker - Pro Edition</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
     <style>
-        :root { --p1: #6366f1; --p2: #ec4899; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        :root { --p1: #6366f1; --p2: #ec4899; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --success: #22c55e; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 1rem; min-height: 100vh; margin: 0; }
-        .container { max-width: 400px; width: 100%; background: var(--card); padding: 2rem; border-radius: 28px; text-align: center; align-self: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .container { max-width: 450px; width: 100%; background: var(--card); padding: 2rem; border-radius: 28px; text-align: center; align-self: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
         
+        /* Lobby Styles */
         .code-box { background: #0f172a; padding: 1.5rem; border-radius: 18px; margin: 1rem 0; border: 1px dashed #475569; }
-        .code-text { font-size: 2rem; font-weight: 800; letter-spacing: 4px; color: var(--p1); }
+        .code-text { font-size: 2.2rem; font-weight: 800; letter-spacing: 4px; color: var(--p1); }
         
+        /* Game Styles */
         #rank-list { list-style: none; padding: 0; margin: 1.5rem 0; }
-        .rank-item { background: #334155; margin-bottom: 10px; padding: 1rem; border-radius: 14px; cursor: grab; display: flex; align-items: center; text-align: left; }
-        .rank-item.dragging { opacity: 0.4; }
+        .rank-item { background: #334155; margin-bottom: 10px; padding: 1rem; border-radius: 14px; cursor: grab; display: flex; align-items: center; text-align: left; font-size: 0.95rem; border: 2px solid transparent; transition: 0.2s; }
+        .rank-item.dragging { opacity: 0.4; border-color: var(--p1); }
         
-        button { width: 100%; padding: 1.1rem; border-radius: 14px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; }
+        /* Interactive Buttons */
+        button { width: 100%; padding: 1.1rem; border-radius: 14px; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 10px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .btn-main { background: var(--p1); color: white; }
+        .btn-main:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-locked { background: var(--success) !important; color: white; cursor: default; transform: none !important; }
         .btn-join { background: #334155; color: white; }
-        input { width: 80%; padding: 12px; border-radius: 10px; border: 2px solid #334155; background: #0f172a; color: white; text-align: center; margin-bottom: 10px; }
+        
+        input { width: 85%; padding: 12px; border-radius: 10px; border: 2px solid #334155; background: #0f172a; color: white; text-align: center; margin-bottom: 10px; font-size: 1.1rem; }
         .hidden { display: none; }
+        .badge { background: var(--p2); padding: 4px 10px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
+        
+        /* Status Text */
+        #turn-msg { font-size: 0.85rem; color: #94a3b8; font-weight: bold; min-height: 1.2rem; margin-bottom: 10px; }
+        .highlight-msg { color: var(--p1) !important; }
     </style>
 </head>
 <body>
@@ -30,15 +40,19 @@
 <div class="container">
     <div id="screen-start">
         <h1>DuoRanker</h1>
-        <p style="color: #94a3b8">No setup. Just play.</p>
+        <div style="margin-bottom:1rem; font-size: 0.8rem; color: #94a3b8;">Select Category:</div>
+        <select id="mode-select" style="width:100%; padding: 12px; border-radius: 12px; background: #0f172a; color: white; margin-bottom: 20px; border: 1px solid #475569;">
+            <option value="couple">Couple & Preference (30 Qs)</option>
+            <option value="personal">Deep & Personal (30 Qs)</option>
+        </select>
         <button class="btn-main" onclick="startHost()">Host a Game</button>
         <div style="margin: 20px 0; color: #475569;">— OR —</div>
-        <input type="text" id="join-id" placeholder="Enter Friend's Code">
+        <input type="text" id="join-id" placeholder="Enter 4-Digit Code">
         <button class="btn-join" onclick="startJoin()">Join Friend</button>
     </div>
 
     <div id="screen-waiting" class="hidden">
-        <h3>Your Code:</h3>
+        <h3>Share this Code:</h3>
         <div class="code-box">
             <div class="code-text" id="my-id-display">...</div>
         </div>
@@ -46,46 +60,61 @@
     </div>
 
     <div id="screen-game" class="hidden">
-        <h3 id="question-text">...</h3>
-        <p id="turn-msg" style="font-size: 0.8rem; color: var(--p1);"></p>
+        <div id="cat-badge" class="badge">MODE</div>
+        <h2 id="question-text" style="margin: 0 0 10px 0;">...</h2>
+        <div id="turn-msg">Initializing...</div>
         <div id="rank-list"></div>
         <button id="submit-btn" class="btn-main" onclick="sendOrder()">Lock Order</button>
     </div>
 
     <div id="screen-results" class="hidden">
-        <h2>Results</h2>
-        <div id="score-display" style="font-size: 3rem; font-weight: bold; margin: 1rem 0;">0%</div>
-        <p id="match-info"></p>
-        <button class="btn-main" onclick="nextRound()">Next Question</button>
+        <h2>Match Score</h2>
+        <div id="score-display" style="font-size: 3.5rem; font-weight: 900; margin: 1rem 0; color: var(--p2);">0%</div>
+        <p id="match-info" style="color: #94a3b8; line-height: 1.5;"></p>
+        <button class="btn-main" onclick="nextRound()">Next Question →</button>
     </div>
 </div>
 
 <script>
-    let peer;
-    let conn;
-    let myRole = ""; // 'host' or 'guest'
-    let truth = null;
-    let currentQIdx = 0;
+    const questionBank = {
+        couple: [
+            { q: "Favorite Date Night?", opts: ["Fancy Dinner", "Movie Night", "Hiking/Nature", "Concert/Event", "Stay Home & Cook"] },
+            { q: "Best Vacation Vibe?", opts: ["Relaxing Beach", "Busy City Trip", "Mountain Cabin", "Theme Parks", "Road Trip"] },
+            { q: "Dream Home Style?", opts: ["Modern Loft", "Cozy Cottage", "Beach House", "Big Mansion", "Farmhouse"] },
+            { q: "Most Important Trait?", opts: ["Loyalty", "Sense of Humor", "Intelligence", "Ambitious", "Kindness"] },
+            { q: "Guilty Pleasure?", opts: ["Reality TV", "Fast Food", "Late Night Shopping", "Sleeping In", "Bad Pop Music"] },
+            { q: "Best Way to Apologize?", opts: ["Long Talk", "Giving Flowers", "Acts of Service", "Small Gift", "Just Hugging"] },
+            { q: "Favorite Season?", opts: ["Early Fall", "Mid-Summer", "Snowy Winter", "Fresh Spring", "Holiday Season"] },
+            { q: "Ideal Morning?", opts: ["Breakfast in Bed", "Gym Session", "Sleeping Late", "Sunrise Walk", "Coffee & Reading"] },
+            { q: "Top Love Language?", opts: ["Words of Affirmation", "Acts of Service", "Physical Touch", "Quality Time", "Receiving Gifts"] },
+            { q: "Life Goal?", opts: ["Travel the World", "Have a Big Family", "Career Success", "Peace of Mind", "Financial Freedom"] }
+            // ... (Rest of your 30 questions go here)
+        ],
+        personal: [
+            { q: "What defines you most?", opts: ["Your Past", "Your Work", "Your Relationships", "Your Dreams", "Your Values"] },
+            { q: "Biggest Motivator?", opts: ["Fear of Failure", "Money", "Helping Others", "Recognition", "Personal Growth"] },
+            { q: "Best Quality in a Friend?", opts: ["Honesty", "Reliability", "Adventurousness", "Listening Skills", "Shared Interests"] },
+            { q: "Where is your 'Safe Space'?", opts: ["In my Bed", "In Nature", "In my Car", "With my Best Friend", "At the Gym"] },
+            { q: "Biggest Personal Challenge?", opts: ["Procrastination", "Overthinking", "Self-Doubt", "Anger Management", "Social Anxiety"] }
+            // ... (Rest of your 30 questions go here)
+        ]
+    };
 
-    const questions = [
-        { q: "Best Pizza Topping?", opts: ["Pepperoni", "Pineapple", "Mushrooms", "Extra Cheese", "Sausage"] },
-        { q: "Dream Superpower?", opts: ["Flight", "Teleportation", "Invisibility", "Time Travel", "Mind Reading"] }
-    ];
+    let peer, conn, myRole, truth, currentQIdx = 0, selectedMode = 'couple', lockedIn = false;
 
     // --- CONNECTION LOGIC ---
 
     function startHost() {
+        selectedMode = document.getElementById('mode-select').value;
         const randomId = Math.floor(1000 + Math.random() * 9000).toString();
-        peer = new Peer(randomId); 
+        peer = new Peer(randomId);
         myRole = "host";
-
         peer.on('open', (id) => {
             document.getElementById('my-id-display').innerText = id;
             showScreen('screen-waiting');
         });
-
-        peer.on('connection', (connection) => {
-            conn = connection;
+        peer.on('connection', (c) => {
+            conn = c;
             setupConnHandlers();
         });
     }
@@ -94,7 +123,6 @@
         const targetId = document.getElementById('join-id').value;
         peer = new Peer();
         myRole = "guest";
-
         peer.on('open', () => {
             conn = peer.connect(targetId);
             setupConnHandlers();
@@ -103,53 +131,87 @@
 
     function setupConnHandlers() {
         conn.on('open', () => {
+            if(myRole === 'host') conn.send({ type: 'INIT_MODE', mode: selectedMode });
             showScreen('screen-game');
-            startRound();
         });
-
         conn.on('data', (data) => {
-            if (data.type === 'TRUTH') {
-                truth = data.order;
-                updateTurn();
-            } else if (data.type === 'GUESS') {
-                showResults(data.order);
-            } else if (data.type === 'NEXT') {
-                currentQIdx++;
-                startRound();
-            }
+            if(data.type === 'INIT_MODE') { selectedMode = data.mode; startRound(); }
+            if(data.type === 'TRUTH') { truth = data.order; updateTurn(); }
+            if(data.type === 'GUESS') { showResults(data.order); }
+            if(data.type === 'NEXT') { currentQIdx++; startRound(); }
         });
+        if(myRole === 'host') startRound();
     }
 
-    // --- GAME LOGIC ---
+    // --- GAME ENGINE ---
 
     function startRound() {
         showScreen('screen-game');
         truth = null;
-        const q = questions[currentQIdx % questions.length];
+        lockedIn = false; // Reset lock for new round
+        
+        const qList = questionBank[selectedMode];
+        const q = qList[currentQIdx % qList.length];
+        
+        document.getElementById('cat-badge').innerText = selectedMode.toUpperCase() + " MODE";
         document.getElementById('question-text').innerText = q.q;
+        
+        const btn = document.getElementById('submit-btn');
+        btn.innerText = "Lock My Order";
+        btn.className = "btn-main";
+        
         renderList(q.opts);
         updateTurn();
     }
 
     function updateTurn() {
         const isHostRound = (currentQIdx % 2 === 0);
+        const iAmSetting = (isHostRound && myRole === 'host') || (!isHostRound && myRole === 'guest');
         const submitBtn = document.getElementById('submit-btn');
         const msg = document.getElementById('turn-msg');
 
-        // Logic: Round 1 (Even) Host sets truth. Round 2 (Odd) Guest sets truth.
-        const iAmSetting = (isHostRound && myRole === 'host') || (!isHostRound && myRole === 'guest');
+        if (lockedIn) {
+            msg.innerText = "Waiting for friend to finish...";
+            msg.classList.remove('highlight-msg');
+            submitBtn.innerText = "✓ Order Locked";
+            submitBtn.className = "btn-locked";
+            return;
+        }
 
         if (iAmSetting) {
-            msg.innerText = "YOUR TURN: Set your preferences!";
+            msg.innerText = "YOUR TURN: SET THE TRUTH";
+            msg.classList.add('highlight-msg');
             submitBtn.classList.remove('hidden');
         } else if (!truth) {
-            msg.innerText = "Waiting for friend to set the order...";
+            msg.innerText = "Waiting for friend to set...";
+            msg.classList.remove('highlight-msg');
             submitBtn.classList.add('hidden');
         } else {
-            msg.innerText = "YOUR TURN: Guess their order!";
+            msg.innerText = "YOUR TURN: GUESS THEIR ORDER";
+            msg.classList.add('highlight-msg');
             submitBtn.classList.remove('hidden');
         }
     }
+
+    function sendOrder() {
+        if(lockedIn) return;
+
+        const order = [...document.querySelectorAll('.rank-item')].map(li => li.innerText);
+        const btn = document.getElementById('submit-btn');
+        
+        lockedIn = true;
+        
+        if (!truth) {
+            conn.send({ type: 'TRUTH', order: order });
+            truth = order;
+        } else {
+            conn.send({ type: 'GUESS', order: order });
+        }
+        
+        updateTurn(); // Refresh button and message state
+    }
+
+    // --- UTILITIES ---
 
     function renderList(opts) {
         const list = document.getElementById('rank-list');
@@ -159,14 +221,14 @@
             li.className = 'rank-item';
             li.draggable = true;
             li.innerText = text;
-            li.addEventListener('dragstart', () => li.classList.add('dragging'));
+            li.addEventListener('dragstart', () => { if(!lockedIn) li.classList.add('dragging') });
             li.addEventListener('dragend', () => li.classList.remove('dragging'));
             list.appendChild(li);
         });
     }
 
-    // Drag support
     document.getElementById('rank-list').addEventListener('dragover', e => {
+        if(lockedIn) return; // Prevent dragging after locking
         e.preventDefault();
         const dragging = document.querySelector('.dragging');
         const list = document.getElementById('rank-list');
@@ -177,18 +239,6 @@
         else list.appendChild(dragging);
     });
 
-    function sendOrder() {
-        const order = [...document.querySelectorAll('.rank-item')].map(li => li.innerText);
-        if (!truth) {
-            conn.send({ type: 'TRUTH', order: order });
-            truth = order; // Locally mark as truth set
-            updateTurn();
-        } else {
-            conn.send({ type: 'GUESS', order: order });
-            showResults(order);
-        }
-    }
-
     function showResults(guessOrder) {
         showScreen('screen-results');
         let pts = 0;
@@ -198,7 +248,7 @@
         });
         const score = Math.round((pts / (truth.length * 2)) * 100);
         document.getElementById('score-display').innerText = score + "%";
-        document.getElementById('match-info').innerText = `Truth: ${truth[0]} | Guess: ${guessOrder[0]}`;
+        document.getElementById('match-info').innerText = `Their #1: ${truth[0]}\nYour Guess #1: ${guessOrder[0]}`;
     }
 
     function nextRound() {

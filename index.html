@@ -9,17 +9,16 @@
 :root{ --p1:#6366f1; --p2:#ec4899; --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --success:#22c55e; --near:#eab308; }
 body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:center;min-height:100vh;padding:1rem;overflow:hidden;}
 .container{max-width:480px;width:100%;background:var(--card);padding:1.5rem;border-radius:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto;}
-.hidden{display:none;}
+.hidden{display:none !important;}
 button{width:100%;padding:1rem;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-top:8px;transition:0.2s;}
 .btn-main{background:var(--p1);color:white;}
 .btn-main:active{transform:scale(0.98);}
 .btn-wait{background:#111827;color:#555;border:1px solid #333;cursor:not-allowed;}
 input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;background:#111827;color:white;border:1px solid #333;box-sizing:border-box;font-size:1rem;}
 #rank-list{position:relative;margin:1.5rem 0;display:flex;flex-direction:column;gap:10px;}
-.rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;transition:transform 0.15s, box-shadow 0.15s;}
+.rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;}
 .rank-item::before{content:"☰";margin-right:12px;opacity:0.3;}
-.rank-item.active{transform:scale(1.05);box-shadow:0 10px 30px rgba(0,0,0,0.5);background:#475569;cursor:grabbing;z-index:100;transition:none;}
-.role-badge{font-size:0.75rem;text-transform:uppercase;font-weight:900;letter-spacing:1.5px;margin-bottom:8px;}
+.rank-item.active{transform:scale(1.05);box-shadow:0 10px 30px rgba(0,0,0,0.5);background:#475569;z-index:100;}
 .result-item{display:flex;justify-content:space-between;padding:12px;border-radius:12px;margin-bottom:8px;font-size:0.9rem;}
 .result-perfect{border-left:5px solid var(--success);background:rgba(34,197,94,0.15);}
 .result-close{border-left:5px solid var(--near);background:rgba(234,179,8,0.15);}
@@ -30,7 +29,7 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
 <div class="container">
 <div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;">Disconnected</div>
 
-<div id="screen-start">
+<div id="screen-start" class="game-screen">
     <h1>DuoRanker</h1>
     <select id="mode-select"><option value="romance">Romance Mode</option><option value="personal">Personal Mode</option></select>
     <select id="length-select"><option value="5">5 Questions</option><option value="10">10 Questions</option></select>
@@ -40,28 +39,28 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
     <button style="background:#334155;color:white;" onclick="startJoin()">Join Game</button>
 </div>
 
-<div id="screen-wait" class="hidden">
+<div id="screen-wait" class="game-screen hidden">
     <p>Room Created!</p>
     <h1 id="room-id" style="font-size:3.5rem;color:var(--p1);letter-spacing:4px;">----</h1>
     <p style="opacity:.7;">Waiting for partner...</p>
 </div>
 
-<div id="screen-game" class="hidden">
-    <div id="role" class="role-badge"></div>
+<div id="screen-game" class="game-screen hidden">
+    <div id="role" style="font-size:0.75rem;text-transform:uppercase;font-weight:900;letter-spacing:1.5px;margin-bottom:8px;"></div>
     <h2 id="question"></h2>
     <div id="rank-list"></div>
     <button id="submit" class="btn-main" onclick="sendOrder()">Lock My Order</button>
     <p id="round" style="font-size:.7rem;color:#64748b; margin-top:10px;"></p>
 </div>
 
-<div id="screen-results" class="hidden">
+<div id="screen-results" class="game-screen hidden">
     <h2 id="res-score" style="color:var(--p2); margin-bottom:10px;">0% Match</h2>
     <div id="result-list"></div>
     <div id="controls" style="margin-top:20px;"></div>
 </div>
 
-<div id="screen-final" class="hidden">
-    <p>Overall Compatibility</p>
+<div id="screen-final" class="game-screen hidden">
+    <p>Overall Score</p>
     <h1 id="final" style="font-size:6rem;color:var(--p1); margin:0;">0%</h1>
     <button class="btn-main" onclick="location.reload()" style="margin-top:20px;">New Game</button>
 </div>
@@ -82,7 +81,10 @@ const bank={
 
 let peer, conn, role, idx=0, mode="romance", max=5, truth=null, locked=false, total=0;
 
-function show(id){document.querySelectorAll(".container>div:not(#status)").forEach(d=>d.classList.add("hidden")); document.getElementById(id).classList.remove("hidden");}
+function show(screenId){
+    document.querySelectorAll(".game-screen").forEach(s => s.classList.add("hidden"));
+    document.getElementById(screenId).classList.remove("hidden");
+}
 
 function startHost(){
     mode=document.getElementById("mode-select").value;
@@ -116,7 +118,8 @@ function setupConnection(){
     });
 }
 
-function enterGame(){ show("screen-game"); round(); }
+function enterGame(){ round(); }
+
 function round(){
     truth=null; locked=false;
     const qSet=bank[mode]; const q=qSet[idx%qSet.length];
@@ -159,17 +162,26 @@ function reveal(t,g){
     const ctrl=document.getElementById("controls"); ctrl.innerHTML="";
     const btn=document.createElement("button");
     if(role==="host"){
-        btn.className="btn-main"; btn.innerText=idx+1>=max?"Final Score":"Next Round →";
-        btn.onclick=()=>{ idx++; conn.send({type:"NEXT",i:idx}); if(idx>=max) showFinal(); else round(); };
+        btn.className="btn-main"; 
+        btn.innerText=idx+1>=max?"Final Results":"Next Round →";
+        btn.onclick=handleNext; 
     } else {
         btn.className="btn-wait"; btn.innerText="Waiting for Host..."; btn.disabled=true;
     }
-    ctrl.appendChild(btn); show("screen-results");
+    ctrl.appendChild(btn); 
+    show("screen-results");
+}
+
+function handleNext(){
+    if(role !== "host") return;
+    idx++;
+    conn.send({type:"NEXT", i:idx});
+    if(idx >= max) showFinal(); else round();
 }
 
 function showFinal(){ show("screen-final"); document.getElementById("final").innerText=Math.round(total/max)+"%"; }
 
-// Drag
+// Drag Logic
 let active=null,startY=0;
 const rList=document.getElementById("rank-list");
 rList.addEventListener("pointerdown",e=>{

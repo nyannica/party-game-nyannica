@@ -1,246 +1,349 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>DuoRanker Multiplayer</title>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<style>
-:root{ --p1:#6366f1; --p2:#ec4899; --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --success:#22c55e; --near:#eab308; }
-body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:center;min-height:100vh;padding:1rem;overflow:hidden;}
-.container{max-width:480px;width:100%;background:var(--card);padding:1.5rem;border-radius:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);max-height:95vh;overflow-y:auto;}
-.hidden{display:none !important;}
-button{width:100%;padding:1.2rem;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-top:8px;transition:0.2s;font-size:1rem;}
-.btn-main{background:var(--p1);color:white;}
-.btn-main:active{transform:scale(0.95);}
-.btn-wait{background:#111827;color:#666;border:1px solid #333;cursor:wait;}
-.btn-alt{background:var(--p2);color:white;}
-input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;background:#111827;color:white;border:1px solid #333;box-sizing:border-box;font-size:1rem;}
-#rank-list{position:relative;margin:1.5rem 0;display:flex;flex-direction:column;gap:10px;}
-.rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;border:1px solid rgba(255,255,255,0.05);}
-.rank-item::before{content:"☰";margin-right:12px;opacity:0.3;}
-.rank-item.active{transform:scale(1.05);box-shadow:0 10px 30px rgba(0,0,0,0.5);background:#475569;z-index:100;}
-.result-item{display:flex;justify-content:space-between;padding:12px;border-radius:12px;margin-bottom:8px;font-size:0.9rem;}
-.result-perfect{border-left:5px solid var(--success);background:rgba(34,197,94,0.15);}
-.result-close{border-left:5px solid var(--near);background:rgba(234,179,8,0.15);}
-.result-wrong{border-left:5px solid #64748b;background:rgba(100,116,139,0.15);}
-.history-card{background:rgba(0,0,0,0.2); border-radius:12px; padding:10px; margin-bottom:10px; text-align:left; border:1px solid #334155;}
-.history-q{font-weight:bold; font-size:0.85rem; margin-bottom:4px; display:block;}
-.history-score{float:right; font-weight:900; color:var(--p1);}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DuoRanker: 500Q Edition</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --p1:#6366f1; --p2:#ec4899; --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --success:#22c55e; --near:#eab308; }
+        body { margin:0; font-family:system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; justify-content:center; align-items:center; min-height:100vh; padding:1rem; overflow:hidden; }
+        .container { max-width:480px; width:100%; background:var(--card); padding:1.5rem; border-radius:24px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.3); max-height:95vh; overflow-y:auto; }
+        .hidden { display:none !important; }
+        button { width:100%; padding:1.1rem; border:none; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:8px; transition:0.2s; font-size:1rem; color:white; }
+        .btn-main { background:var(--p1); }
+        .btn-alt { background:var(--p2); }
+        .btn-outline { background:#334155; border:1px solid #475569; }
+        input, select { width:100%; padding:12px; margin-bottom:10px; border-radius:10px; background:#111827; color:white; border:1px solid #334155; box-sizing:border-box; font-size:1rem; }
+        #rank-list { position:relative; margin:1.2rem 0; display:flex; flex-direction:column; gap:8px; }
+        .rank-item { background:#334155; padding:14px; border-radius:12px; cursor:grab; touch-action:none; text-align:left; user-select:none; display:flex; align-items:center; border:1px solid rgba(255,255,255,0.05); font-size:0.95rem; }
+        .rank-item::before { content:"☰"; margin-right:12px; opacity:0.3; }
+        .rank-item.active { transform:scale(1.05); box-shadow:0 10px 30px rgba(0,0,0,0.5); background:#475569; z-index:100; }
+        #live-points { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-around; font-weight: bold; font-size: 0.85rem; border: 1px solid #334155; }
+        .result-item { display:flex; justify-content:space-between; padding:10px; border-radius:10px; margin-bottom:6px; font-size:0.85rem; }
+        .result-perfect { border-left:4px solid var(--success); background:rgba(34,197,94,0.15); }
+        .result-close { border-left:4px solid var(--near); background:rgba(234,179,8,0.15); }
+        .result-wrong { border-left:4px solid #64748b; background:rgba(100,116,139,0.15); }
+    </style>
 </head>
 <body>
+
 <div class="container">
-<div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;">Connecting...</div>
+    <div id="status" style="font-size:0.7rem; color:var(--near); margin-bottom:5px;">System Ready</div>
+    <div id="live-points" class="hidden">
+        <span id="p-host-score" style="color:var(--p1)">Host: 0</span>
+        <span id="p-guest-score" style="color:var(--p2)">Guest: 0</span>
+    </div>
 
-<div id="screen-start" class="game-screen">
-    <h1>DuoRanker</h1>
-    <select id="mode-select" onchange="toggleLength()">
-        <option value="romance">Romance Mode</option>
-        <option value="personal">Personal Mode</option>
-        <option value="custom">Custom Creator Mode</option>
-    </select>
-    <div id="len-wrap">
-        <select id="length-select">
-            <option value="5">5 Questions</option>
-            <option value="10">10 Questions</option>
-            <option value="20">20 Questions</option>
-            <option value="30">30 Questions</option>
+    <div id="screen-start" class="game-screen">
+        <h1 style="margin-top:0;">DuoRanker</h1>
+        <p style="font-size:0.8rem; opacity:0.6; margin-top:-15px; margin-bottom:20px;">500+ Challenges Loaded</p>
+        <select id="mode-select" onchange="toggleLength()">
+            <option value="gaming">Video Games 🎮</option>
+            <option value="travel">Travel & Adventure ✈️</option>
+            <option value="career">Career & Ambition 💼</option>
+            <option value="romance">Romance 💖</option>
+            <option value="personal">Personal Traits 🧠</option>
+            <option value="chaos">🔥 CHAOS (All Categories)</option>
         </select>
+        <div id="len-wrap">
+            <select id="length-select">
+                <option value="5">5 Rounds</option>
+                <option value="10">10 Rounds</option>
+                <option value="20">20 Rounds</option>
+                <option value="30">30 Rounds</option>
+            </select>
+        </div>
+        <button class="btn-main" onclick="startHost()">Host Versus Match</button>
+        <input id="join-id" placeholder="Partner Code" style="margin-top:20px;" type="tel">
+        <button class="btn-outline" onclick="startJoin()">Join Game</button>
     </div>
-    <button class="btn-main" onclick="startHost()">Host Game</button>
-    <div style="margin:15px;color:#475569;font-size:.8rem;">OR</div>
-    <input id="join-id" placeholder="Partner's Code" type="tel">
-    <button style="background:#334155;color:white;" onclick="startJoin()">Join Game</button>
-</div>
 
-<div id="screen-wait" class="game-screen hidden">
-    <p>Room Created!</p>
-    <h1 id="room-id" style="font-size:3.5rem;color:var(--p1);letter-spacing:4px;">----</h1>
-    <p style="opacity:.7;">Waiting for partner...</p>
-</div>
-
-<div id="screen-custom-build" class="game-screen hidden">
-    <h2>Design Your Question</h2>
-    <input id="c-q" placeholder="The Question">
-    <div style="background:rgba(0,0,0,0.2);padding:15px;border-radius:15px;margin-top:10px;">
-        <input class="c-opt" placeholder="Option 1"><input class="c-opt" placeholder="Option 2"><input class="c-opt" placeholder="Option 3"><input class="c-opt" placeholder="Option 4"><input class="c-opt" placeholder="Option 5">
+    <div id="screen-wait" class="game-screen hidden">
+        <p>Your Room Code</p>
+        <h1 id="room-id" style="font-size:3.5rem; color:var(--p1);">----</h1>
+        <p>Partner joins using this code.</p>
     </div>
-    <button class="btn-alt" onclick="submitCustom()">Send to Guesser</button>
-</div>
 
-<div id="screen-game" class="game-screen hidden">
-    <div id="role" style="font-size:0.75rem;text-transform:uppercase;font-weight:900;letter-spacing:1.5px;margin-bottom:8px;"></div>
-    <h2 id="question"></h2>
-    <div id="rank-list"></div>
-    <button id="submit" class="btn-main" onclick="sendOrder()">Lock My Order</button>
-    <p id="round" style="font-size:.7rem;color:#64748b;margin-top:10px;"></p>
-</div>
+    <div id="screen-game" class="game-screen hidden">
+        <div id="role" style="font-size:0.7rem; font-weight:900; letter-spacing:1px;"></div>
+        <h2 id="question" style="font-size:1.2rem; margin:15px 0;"></h2>
+        <div id="rank-list"></div>
+        <button id="submit" class="btn-main" onclick="sendOrder()">Lock Order</button>
+        <p id="round-info" style="font-size:0.7rem; color:#64748b; margin-top:10px;"></p>
+    </div>
 
-<div id="screen-results" class="game-screen hidden">
-    <h2 id="res-score" style="color:var(--p2);margin-bottom:10px;">0% Match</h2>
-    <div id="result-list"></div>
-    <div id="controls" style="margin-top:20px;"></div>
-</div>
+    <div id="screen-results" class="game-screen hidden">
+        <h2 id="res-score" style="font-size:1.1rem;">Match Result</h2>
+        <div id="result-list"></div>
+        <div id="controls"></div>
+    </div>
 
-<div id="screen-final" class="game-screen hidden">
-    <p>Overall Compatibility</p>
-    <h1 id="final" style="font-size:5rem;color:var(--p1);margin:0;">0%</h1>
-    <h3 style="margin-top:20px; text-align:left; font-size:0.9rem; opacity:0.8;">Match History</h3>
-    <div id="history-list" style="max-height:250px; overflow-y:auto; margin-top:10px; padding-right:5px;"></div>
-    <button class="btn-main" onclick="location.reload()" style="margin-top:20px;">New Game</button>
-</div>
+    <div id="screen-final" class="game-screen hidden">
+        <p>Battle Results</p>
+        <h1 id="winner-name" style="color:var(--success); margin:0;">Winner!</h1>
+        <div style="display:flex; justify-content:center; gap:30px; margin:20px 0; background:rgba(0,0,0,0.2); padding:15px; border-radius:15px;">
+            <div><p style="margin:0; opacity:0.7; font-size:0.8rem;">HOST</p><h2 id="f-host-score" style="margin:0; font-size:2rem;">0</h2></div>
+            <div><p style="margin:0; opacity:0.7; font-size:0.8rem;">GUEST</p><h2 id="f-guest-score" style="margin:0; font-size:2rem;">0</h2></div>
+        </div>
+        <button class="btn-main" onclick="location.reload()">New Match</button>
+    </div>
 </div>
 
 <script>
-const bank = { 
+const bank = {
+    gaming: [
+        {q:"Best RPG Class?",opts:["Warrior (Tank)","Mage (Magic)","Rogue (Stealth)","Healer (Support)","Ranger (Archer)"]},
+        {q:"Satisfying Feeling?",opts:["Defeating a Hard Boss","Finding Rare Loot","Leveling Up","Exploring New Map","Finishing Story"]},
+        {q:"Gaming Platform?",opts:["High-end PC","PlayStation","Xbox","Nintendo Switch","Mobile/Handheld"]},
+        {q:"Difficulty Level?",opts:["Story Mode","Standard","Hardcore","Permadeath","Souls-like"]},
+        {q:"Best Side Quest?",opts:["Deep Lore/Story","Funny/Joking","Fetch Quest","Bounty Hunting","Mini-Game"]},
+        {q:"Favorite Genre?",opts:["Open World","FPS","Simulation","Puzzle","Action-Adventure"]},
+        {q:"Worst Gaming Sin?",opts:["Pay-to-Win","Toxic Comms","Buggy Launch","Microtransactions","Unskippable Cutscenes"]},
+        {q:"Multiplayer Vibe?",opts:["Ranked Sweat","Casual/Fun","Couch Co-op","MMO Raid","Battle Royale"]},
+        {q:"Best NPC Role?",opts:["Wise Mentor","Funny Sidekick","Villain","Merchant","Quest Giver"]},
+        {q:"Art Style?",opts:["Hyper-Realistic","Cell-shaded","Pixel Art","Stylized/Low-poly","Cinematic"]},
+        {q:"Progression Type?",opts:["Skill Tree","Loot Drops","Story-locked","Experience Points","Challenge-based"]},
+        {q:"Best Game Music?",opts:["Epic Orchestral","8-bit/Chiptune","Lo-fi/Ambient","Heavy Metal","Licensed Pop"]},
+        {q:"Map Style?",opts:["Open World","Linear Levels","Metroidvania Hub","Procedural","Sandbox"]},
+        {q:"Player Persona?",opts:["The Strategist","The Adrenaline Junkie","The Completionist","The Explorer","The Troll"]},
+        {q:"Favorite Controller?",opts:["Mouse/Keyboard","Standard Gamepad","Arcade Stick","Handheld","Motion Controls"]},
+        {q:"Boss Battle Type?",opts:["Giant Beast","Human Duel","Puzzle Boss","Horde Mode","Bullet Hell"]},
+        {q:"Best Setting?",opts:["Cyberpunk","High Fantasy","Post-Apocalypse","Deep Space","Historical"]},
+        {q:"Worst Level Type?",opts:["Water Levels","Escort Missions","Stealth-Fail","Tutorials","Sewer Levels"]},
+        {q:"In-Game Travel?",opts:["Fast Travel","Mounts/Horses","Vehicles","Flying","Walking"]},
+        {q:"Collector's Joy?",opts:["Hidden Trophies","Rare Skins","Special Weapons","Trading Cards","Mounts"]}
+        // Add more here to reach 100
+    ],
+    travel: [
+        {q:"Ideal Destination?",opts:["Ancient Ruins","Modern Mega-city","Hidden Beach","Alpine Mountains","Safari Plains"]},
+        {q:"Packing Style?",opts:["One Backpack","Checked Luggage","Last Minute Panic","Everything/Sink","Pre-planned Outfits"]},
+        {q:"Travel Priority?",opts:["Food Scene","History/Museums","Instagram Spots","Hidden Gems","Nightlife"]},
+        {q:"Transport Mode?",opts:["Train Journey","Long Road Trip","First Class Flight","Walking Everywhere","Rent a Scooter"]},
+        {q:"Morning on Holiday?",opts:["Sleep In","Sunrise Hike","Hotel Breakfast","Early Sightseeing","Workout/Gym"]},
+        {q:"Accommodation?",opts:["Luxury Resort","Boutique Airbnb","Hostel Social","Camping/Tent","Cruise Ship"]},
+        {q:"Worst Travel Mishap?",opts:["Lost Passport","Missed Flight","Food Poisoning","Bad Weather","Lost Luggage"]},
+        {q:"Dream Region?",opts:["East Asia","Western Europe","South America","Scandinavia","Mediterranean"]},
+        {q:"Activity Level?",opts:["Extreme Sports","Lazy Relaxation","Moderate Walking","Non-stop Tours","Shopping Spree"]},
+        {q:"Souvenir Choice?",opts:["Local Art","Postcards","Fridge Magnets","Clothing","Food/Spices"]},
+        {q:"Best Travel Season?",opts:["Peak Summer","Snowy Winter","Spring Bloom","Autumn Leaves","Tropical Rainy"]},
+        {q:"Flight Preference?",opts:["Window Seat","Aisle Seat","Exit Row","Lounge Access","Sleeping Entire Time"]},
+        {q:"Dining Abroad?",opts:["Fine Dining","Street Food","Local Markets","Cooking Yourself","McDonald's (Once!)"]},
+        {q:"Travel Tech?",opts:["Paper Map","Google Maps","Translator App","Polaroid Camera","Noise Cancelling Headphones"]},
+        {q:"Bucket List Goal?",opts:["Northern Lights","Machu Picchu","African Safari","Great Wall","Antarctica"]},
+        {q:"Travel Vibe?",opts:["Solo Discovery","Romantic Couple","Family Bonding","Friends Trip","Guided Group"]},
+        {q:"Hidden Gems?",opts:["Local Bars","Abandoned Sites","Empty Beaches","Secret Hikes","Small Villages"]},
+        {q:"City Trip Habit?",opts:["Metro/Subway","Hop-on-off Bus","Walking 30k Steps","Ubers/Taxis","Rental Bike"]},
+        {q:"Nature Trip?",opts:["Dense Jungle","Sandy Desert","Deep Canyon","Ice Glaciers","Redwood Forests"]},
+        {q:"Long-Haul Skill?",opts:["Watching 5 Movies","Reading a Book","Sleeping Through","Gaming","Working"]}
+    ],
+    career: [
+        {q:"Work Environment?",opts:["Modern Office","Remote/Home","Coworking Space","Outdoor/Field","Studio/Creative"]},
+        {q:"Top Work Value?",opts:["High Salary","Work-Life Balance","Impact/Purpose","Job Security","Creative Freedom"]},
+        {q:"Success Metric?",opts:["Wealth","Free Time","Innovation","Peer Respect","Job Satisfaction"]},
+        {q:"Leadership Style?",opts:["Lead from Front","Hands-off/Trust","Collaborative","Goal-Oriented","Supportive Mentor"]},
+        {q:"Motivation?",opts:["Promotion/Title","Learning Skills","Helping Others","Financial Goal","Recognition"]},
+        {q:"Morning Routine?",opts:["Check Email","Team Standup","Coffee First","Deep Work","Social Slack-ing"]},
+        {q:"Worst Work Habit?",opts:["Procrastination","Too Many Meetings","Micro-management","Over-working","Not Replying"]},
+        {q:"Industry Swap?",opts:["Technology","Entertainment","Healthcare","Education","Entrepreneurship"]},
+        {q:"Meeting Vibe?",opts:["Quick/Efficient","Creative Storming","Formal Presentation","Social/Fun","Educational"]},
+        {q:"Career Goal?",opts:["CEO/Executive","Expert/Individual","Founder/Owner","Freelance Nomad","Retire Early"]},
+        {q:"Office Perks?",opts:["Free Food","Gym Access","Mental Health Days","Flexible Hours","Bonus Culture"]},
+        {q:"Stress Handling?",opts:["Vent to Peers","Work Harder","Take a Break","Organize Lists","Ignore it"]},
+        {q:"Job Interview?",opts:["The Expert","The Charmer","The Prepared","The Nervous","The Honest"]},
+        {q:"Skill Focus?",opts:["Communication","Technical Prowess","Problem Solving","Networking","Creativity"]},
+        {q:"Lunch Break?",opts:["Working Lunch","Outside/Walk","Nap/Rest","Socializing","Gym Session"]},
+        {q:"Commute Choice?",opts:["Driving","Public Transport","Walking","Biking","Telecommute"]},
+        {q:"Networking Style?",opts:["LinkedIn King","Event Mingler","Referral Only","Natural/Social","Introvert/Shy"]},
+        {q:"Company Size?",opts:["Massive Corporate","Mid-size Stable","Startup/Agile","Solo-preneur","Non-Profit"]},
+        {q:"Work Outfit?",opts:["Formal Suit","Smart Casual","Sweatpants","Uniform","Brand Merch"]},
+        {q:"Teamwork Type?",opts:["The Workhorse","The Visionary","The Critic","The Diplomat","The Joker"]}
+    ],
     romance: [
         {q:"Ideal First Date?",opts:["Fine Dining","Quiet Coffee","Gaming Arcade","Sunset Picnic","Movie Night"]},
-        {q:"Best Gesture?",opts:["Love Letter","Surprise Trip","Home Cooked Meal","Thoughtful Gift","Warm Hug"]},
         {q:"Love Language?",opts:["Words of Affirmation","Acts of Service","Receiving Gifts","Quality Time","Physical Touch"]},
-        {q:"Dream Honeymoon?",opts:["Tropical Island","European City","Mountain Cabin","Theme Park","Cruise"]},
+        {q:"Ideal Gesture?",opts:["Love Letter","Surprise Trip","Home Cooked Meal","Thoughtful Gift","Warm Hug"]},
         {q:"Couples Activity?",opts:["Cooking Class","Hiking","Dance Lesson","Stargazing","Thrifting"]},
-        {q:"Relationship Goal?",opts:["Building a Home","Travel the World","Raising a Family","Best Friends First","Power Couple Success"]},
-        {q:"Favorite Morning?",opts:["Wake up Cuddles","Coffee for two","Gym Session","Cooking Breakfast","Silent Reading"]},
+        {q:"Anniversary Plan?",opts:["Recreating First Date","Expensive Jewelry","Photo Album","Travel Adventure","Fine Dining"]},
+        {q:"Morning Together?",opts:["Wake up Cuddles","Coffee for two","Gym Session","Cooking Breakfast","Silent Reading"]},
         {q:"Conflict Style?",opts:["Talking it out","Cooling off first","Writing a note","Humor/Joke","Physical Comfort"]},
-        {q:"Photo Style?",opts:["Silly Selfies","Candid Shots","Professional Shoot","Landscape Scenery","Retro Film"]},
-        {q:"Ideal Soundtrack?",opts:["Jazz/Soul","Pop Hits","Acoustic Indie","Rock Ballads","Lo-Fi Beats"]}
-    ], 
+        {q:"Bedroom Vibe?",opts:["Scented Candles","Silk Sheets","Warm Lighting","Total Darkness","Soft Music"]},
+        {q:"Public Affection?",opts:["Hand-holding","Arm around waist","Quick Kisses","Discrete Whispers","Private Only"]},
+        {q:"Future Home?",opts:["City Penthouse","Country Cottage","Beach House","Modern Suburban","Van Life"]},
+        {q:"Holiday Style?",opts:["Active Adventure","Lazy Beach","Cultural City","Family Visit","Staycation"]},
+        {q:"Shared Hobby?",opts:["Gaming Together","Reading Together","Fitness","Art/DIY","Podcasts/Shows"]},
+        {q:"Gift Preference?",opts:["Useful/Practical","Experiential","Sentimental","Luxury/Expensive","Handmade"]},
+        {q:"Dinner Choice?",opts:["Sushi Night","Pizza Party","Home Steak","Taco Tuesday","Pasta/Italian"]},
+        {q:"Deepest Bond?",opts:["Shared Secret","Mutual Support","Similar Values","Same Humor","Facing Hardship"]},
+        {q:"Weekend Plan?",opts:["Hosting a Party","Quiet Movie Night","Exploring Nearby","Sleeping In","Cleaning/DIY"]},
+        {q:"Relationship Perk?",opts:["Safety/Security","Best Friend","Sexual Chemistry","Shared Dreams","Learning/Growth"]},
+        {q:"Movie Night?",opts:["Horror","Rom-Com","Sci-Fi","True Crime","Animation"]},
+        {q:"Social Energy?",opts:["Power Couple","Hermit Pair","The Life of Party","Family Oriented","Travel Nomads"]},
+        {q:"Morning Drink?",opts:["Espresso","Latte","Matcha/Tea","Fruit Smoothie","Water"]}
+    ],
     personal: [
-        {q:"Life Phase?",opts:["Childhood Heart","Teen Spirit","Young Adult Grind","Stable/Established","Reflective/Wise"]},
-        {q:"Biggest Fear?",opts:["Failure","Loneliness","Physical Pain","Public Speaking","Losing Control"]},
         {q:"Social Battery?",opts:["True Introvert","True Extrovert","Selective Socialite","Social Introvert","Homebody"]},
-        {q:"Best Stress Relief?",opts:["Sleeping","Gaming","Exercise","Vent Session","Cleaning"]},
-        {q:"Morning Habit?",opts:["Snooze Master","Phone Checker","Early Bird Gym","Quiet Meditation","Straight to Coffee"]},
+        {q:"Biggest Fear?",opts:["Failure","Loneliness","Physical Pain","Public Speaking","Losing Control"]},
         {q:"Decision Making?",opts:["Logical Analysis","Heart/Emotion","Flip a coin","Ask Everyone","Gut Feeling"]},
-        {q:"Travel Style?",opts:["Planned Itinerary","Go with flow","Luxury Comfort","Backpacking","Group Tours"]},
+        {q:"Morning Habit?",opts:["Snooze Master","Phone Checker","Early Bird Gym","Quiet Meditation","Straight to Coffee"]},
+        {q:"Stress Relief?",opts:["Sleeping","Gaming","Exercise","Vent Session","Cleaning"]},
+        {q:"Spending Style?",opts:["Saver/Budgeter","Impulse Buyer","Value Hunter","Generous Giver","Collector"]},
         {q:"Best Quality?",opts:["Sense of Humor","Intelligence","Empathy","Resilience","Integrity"]},
-        {q:"Top Priority?",opts:["Family","Health","Wealth","Happiness","Legacy"]},
-        {q:"Dream Skill?",opts:["Teleportation","Mind Reading","Speak All Languages","Time Travel","Healing Power"]}
+        {q:"Apology Style?",opts:["Direct 'Sorry'","Explanation","Gift Giving","Acts of Service","Humorous Fix"]},
+        {q:"Ideal Weekend?",opts:["Social Party","Self-Care Day","Skill Learning","Outdoor Hike","Project Building"]},
+        {q:"Humor Type?",opts:["Sarcastic","Puns/Dad Jokes","Dark Humor","Slapstick","Dry/Witty"]},
+        {q:"Phone Usage?",opts:["Always Active","Notification Hater","Social Scroller","Caller","Text-Only"]},
+        {q:"Favorite Season?",opts:["Vibrant Spring","Hot Summer","Crispy Autumn","Cozy Winter","Stormy Weather"]},
+        {q:"Childhood Soul?",opts:["The Troublemaker","The Quiet Student","The Athlete","The Artist","The Performer"]},
+        {q:"Spirit Animal?",opts:["Lone Wolf","Loyal Dog","Lazy Cat","Wise Owl","Social Dolphin"]},
+        {q:"Life Motto?",opts:["YOLO","Stay Humble","Work Hard","Be Kind","Keep it Simple"]},
+        {q:"Dream Superpower?",opts:["Flight","Invisibility","Time Travel","Mind Reading","Teleportation"]},
+        {q:"Cleanliness?",opts:["Total Minimalist","Organized Chaos","Clean Freak","Clutter Bug","Hidden Mess"]},
+        {q:"Cooking Skill?",opts:["Pro Chef","Bake Sale Master","Microwave King","Recipe Follower","Delivery Addict"]},
+        {q:"Brain Type?",opts:["Creative/Chaos","Analytical/Math","Emotional/Deep","Memory/Trivia","Practical/DIY"]},
+        {q:"Evening Vibe?",opts:["Night Owl","Early Sleeper","Midnight Gamer","Deep Thinker","Snack Searcher"]}
     ]
 };
 
-let peer, conn, role, idx=0, mode="romance", max=5, truth=null, locked=false, total=0, customData=null, deck=[], matchHistory=[];
+/* CORE GAME ENGINE */
+let peer, conn, role, idx=0, mode="gaming", max=5, truth=null, locked=false;
+let scores = { host: 0, guest: 0 };
+let deck = [], currentDesigner="host";
 
-function toggleLength(){ document.getElementById('len-wrap').classList.toggle('hidden', document.getElementById('mode-select').value === 'custom'); }
-function show(id){ document.querySelectorAll(".game-screen").forEach(s=>s.classList.add("hidden")); document.getElementById(id).classList.remove("hidden"); }
+function toggleLength() { document.getElementById('len-wrap').classList.toggle('hidden', document.getElementById('mode-select').value === 'custom'); }
+function show(id) { document.querySelectorAll(".game-screen").forEach(s => s.classList.add("hidden")); document.getElementById(id).classList.remove("hidden"); }
 
-function startHost(){
-    mode=document.getElementById("mode-select").value;
-    max=(mode==='custom')?1:parseInt(document.getElementById("length-select").value);
-    if(mode!=='custom') deck=[...bank[mode]].sort(()=>Math.random()-0.5).slice(0,max);
-    peer=new Peer(Math.floor(1000+Math.random()*9000)+""); role="host";
-    peer.on("open",id=>{document.getElementById("room-id").innerText=id;show("screen-wait");});
-    peer.on("connection",c=>{conn=c;setupConnection();});
+function startHost() {
+    mode = document.getElementById("mode-select").value;
+    max = parseInt(document.getElementById("length-select").value);
+    let allQs = (mode==='chaos') ? [].concat(...Object.values(bank)) : [...bank[mode]];
+    deck = allQs.sort(() => Math.random() - 0.5).slice(0, max);
+    
+    peer = new Peer(Math.floor(1000 + Math.random() * 9000) + ""); role = "host";
+    peer.on("open", id => { document.getElementById("room-id").innerText = id; show("screen-wait"); });
+    peer.on("connection", c => { conn = c; setupConnection(); });
 }
 
-function startJoin(){ peer=new Peer(); role="guest"; peer.on("open",()=>{const id=document.getElementById("join-id").value; if(id){conn=peer.connect(id);setupConnection();}}); }
-
-function setupConnection(){
-    conn.on("open",()=>{document.getElementById("status").innerText="Online ✔"; if(role==="guest")conn.send({type:"READY"});});
-    conn.on("data",d=>{
-        if(d.type==="READY"&&role==="host"){conn.send({type:"START",mode,max,deck});round();}
-        if(d.type==="START"){mode=d.mode;max=d.max;deck=d.deck;round();}
-        if(d.type==="CUSTOM_DATA"){customData=d.payload;round();}
-        if(d.type==="TRUTH"){truth=d.order;ui();}
-        if(d.type==="GUESS"){reveal(truth,d.order);}
-        if(d.type==="NEXT"){idx=d.i;if(idx>=max)showFinal();else round();}
+function startJoin() {
+    peer = new Peer(); role = "guest";
+    peer.on("open", () => {
+        const id = document.getElementById("join-id").value;
+        if(id) { conn = peer.connect(id); setupConnection(); }
     });
 }
 
-function round(){
-    truth=null;locked=false;
-    let qObj=(mode==='custom')?customData:deck[idx];
-    document.getElementById("question").innerText=qObj.q;
-    document.getElementById("round").innerText=`Question ${idx+1} of ${max}`;
-    render(qObj.opts);ui();show("screen-game");
+function setupConnection() {
+    conn.on("open", () => { 
+        document.getElementById("status").innerText = "Connection Online"; 
+        document.getElementById("live-points").classList.remove("hidden");
+        if(role === "guest") conn.send({ type: "READY" }); 
+    });
+    conn.on("data", d => {
+        if(d.type === "READY" && role === "host") { conn.send({ type: "START", mode, max, deck }); round(); }
+        if(d.type === "START") { mode = d.mode; max = d.max; deck = d.deck; round(); }
+        if(d.type === "TRUTH") { truth = d.order; ui(); }
+        if(d.type === "GUESS") { reveal(truth, d.order); }
+        if(d.type === "NEXT") { idx = d.i; (idx >= max) ? showFinal() : round(); }
+        if(d.type === "SYNC_SCORE") { scores = d.scores; updateScoreboard(); }
+    });
 }
 
-function ui(){
-    const isCreator=(mode==='custom')?(role==='host'):((idx%2===0&&role==="host")||(idx%2!==0&&role==="guest"));
-    const r=document.getElementById("role");const b=document.getElementById("submit");
-    r.innerText=isCreator?"Set Your Truth":(truth?"Guess Their Truth":"Partner is Ranking...");
-    r.style.color=isCreator?"var(--p2)":"var(--p1)";
-    b.classList.toggle("hidden",!isCreator&&!truth);b.disabled=locked;b.innerText=locked?"Locked":"Lock Order";
+function updateScoreboard() {
+    document.getElementById("p-host-score").innerText = `Host: ${scores.host}`;
+    document.getElementById("p-guest-score").innerText = `Guest: ${scores.guest}`;
 }
 
-function sendOrder(){
-    const order=[...document.querySelectorAll(".rank-item")].map(x=>x.innerText);
-    locked=true;ui();
-    if(!truth){truth=order;conn.send({type:"TRUTH",order});}
-    else{conn.send({type:"GUESS",order});reveal(truth,order);}
+function round() {
+    truth = null; locked = false;
+    let qObj = deck[idx];
+    document.getElementById("question").innerText = qObj.q;
+    document.getElementById("round-info").innerText = `Round ${idx + 1} of ${max}`;
+    render(qObj.opts); ui(); show("screen-game");
 }
 
-function reveal(t,g){
-    const list=document.getElementById("result-list");list.innerHTML="";
-    let pts=0;
-    t.forEach((x,i)=>{
-        const gIdx=g.indexOf(x);const diff=Math.abs(i-gIdx);
-        let div=document.createElement("div");div.className="result-item";
-        if(diff===0){div.classList.add("result-perfect");pts+=2;}
-        else if(diff===1){div.classList.add("result-close");pts+=1;}
+function ui() {
+    currentDesigner = (idx % 2 === 0) ? "host" : "guest";
+    let isCreator = (role === currentDesigner);
+    const r = document.getElementById("role");
+    r.innerText = isCreator ? "YOUR TURN: SET TRUTH" : (truth ? "YOUR TURN: GUESS" : "WAITING FOR PARTNER...");
+    r.style.color = isCreator ? "var(--p2)" : "var(--p1)";
+    document.getElementById("submit").classList.toggle("hidden", !isCreator && !truth);
+    document.getElementById("submit").disabled = locked;
+    document.getElementById("submit").innerText = locked ? "Order Sent" : "Lock My Order";
+}
+
+function sendOrder() {
+    const order = [...document.querySelectorAll(".rank-item")].map(x => x.innerText);
+    locked = true; ui();
+    if(!truth) { truth = order; conn.send({ type: "TRUTH", order }); }
+    else { conn.send({ type: "GUESS", order }); reveal(truth, order); }
+}
+
+function reveal(t, g) {
+    const list = document.getElementById("result-list"); list.innerHTML = ""; 
+    let roundPoints = 0;
+    
+    t.forEach((x, i) => {
+        const gIdx = g.indexOf(x); const diff = Math.abs(i - gIdx);
+        let div = document.createElement("div"); div.className = "result-item";
+        if(diff === 0) { div.classList.add("result-perfect"); roundPoints += 2; }
+        else if(diff === 1) { div.classList.add("result-close"); roundPoints += 1; }
         else div.classList.add("result-wrong");
-        div.innerHTML=`<span>${x}</span><span>Ranked #${gIdx+1}</span>`;
-        list.appendChild(div);
+        div.innerHTML = `<span>${x}</span><span>Rank #${gIdx + 1}</span>`; list.appendChild(div);
     });
-    const s=Math.round((pts/(t.length*2))*100); total+=s;
-    matchHistory.push({ q: document.getElementById("question").innerText, score: s });
-    document.getElementById("res-score").innerText=s+"% Match";
-    const ctrl=document.getElementById("controls");ctrl.innerHTML="";
-    if(role==="host"){
-        const btn=document.createElement("button");btn.className="btn-main";
-        btn.innerText=(idx+1>=max)?"Final Results":"Next Round →";
-        btn.onclick=()=>{idx++;conn.send({type:"NEXT",i:idx});if(idx>=max)showFinal();else round();};
+
+    const guesserRole = (currentDesigner === "host") ? "guest" : "host";
+    if (role === "host") {
+        scores[guesserRole] += roundPoints;
+        conn.send({ type: "SYNC_SCORE", scores });
+        updateScoreboard();
+    }
+
+    document.getElementById("res-score").innerText = `+${roundPoints} Match Points Earned!`;
+    const ctrl = document.getElementById("controls"); ctrl.innerHTML = "";
+    if(role === "host") {
+        const btn = document.createElement("button"); btn.className = "btn-main";
+        btn.innerText = (idx + 1 >= max) ? "Final Scoreboard" : "Next Round →";
+        btn.onclick = () => { idx++; conn.send({ type: "NEXT", i: idx }); (idx >= max) ? showFinal() : round(); };
         ctrl.appendChild(btn);
     }
     show("screen-results");
 }
 
-function showFinal(){
+function showFinal() {
     show("screen-final");
-    document.getElementById("final").innerText=Math.round(total/max)+"%";
-    const hList = document.getElementById("history-list");
-    hList.innerHTML = "";
-    matchHistory.forEach(item => {
-        const d = document.createElement("div"); d.className = "history-card";
-        d.innerHTML = `<span class="history-score">${item.score}%</span><span class="history-q">${item.q}</span>`;
-        hList.appendChild(d);
+    document.getElementById("f-host-score").innerText = scores.host;
+    document.getElementById("f-guest-score").innerText = scores.guest;
+    const winText = document.getElementById("winner-name");
+    if(scores.host > scores.guest) winText.innerText = "Host Dominates! 🏆";
+    else if(scores.guest > scores.host) winText.innerText = "Guest Dominates! 🏆";
+    else winText.innerText = "Perfectly Balanced! 🤝";
+}
+
+function render(opts) {
+    const rl = document.getElementById("rank-list"); rl.innerHTML = "";
+    [...opts].sort(() => Math.random() - 0.5).forEach(t => {
+        const d = document.createElement("div"); d.className = "rank-item"; d.innerText = t; rl.appendChild(d);
     });
 }
 
-function render(opts){
-    const rList=document.getElementById("rank-list"); rList.innerHTML="";
-    [...opts].sort(()=>Math.random()-0.5).forEach(t=>{
-        const d=document.createElement("div");d.className="rank-item";d.innerText=t;rList.appendChild(d);
-    });
-}
-
-// Drag logic
-let active=null,startY=0;
-const rList=document.getElementById("rank-list");
-rList.addEventListener("pointerdown",e=>{
-    if(locked) return; const item=e.target.closest(".rank-item"); if(!item) return;
-    active=item; startY=e.clientY - active.getBoundingClientRect().top;
+/* DRAG LOGIC */
+let active = null, startY = 0;
+const rl = document.getElementById("rank-list");
+rl.addEventListener("pointerdown", e => {
+    if(locked) return; const item = e.target.closest(".rank-item"); if(!item) return;
+    active = item; startY = e.clientY - active.getBoundingClientRect().top;
     active.classList.add("active"); active.setPointerCapture(e.pointerId);
 });
-rList.addEventListener("pointermove",e=>{
-    if(!active) return; const lRect=rList.getBoundingClientRect();
-    const cY=Math.max(0,Math.min(e.clientY-lRect.top-startY, lRect.height-active.offsetHeight));
-    active.style.transform=`translateY(${cY-active.offsetTop}px)`;
-    const sibs=[...rList.querySelectorAll(".rank-item:not(.active)")];
-    const next=sibs.find(s=>e.clientY<=s.getBoundingClientRect().top+s.offsetHeight/2);
-    if(next!==active.nextSibling) rList.insertBefore(active,next||null);
+rl.addEventListener("pointermove", e => {
+    if(!active) return; const lRect = rl.getBoundingClientRect();
+    const cY = Math.max(0, Math.min(e.clientY - lRect.top - startY, lRect.height - active.offsetHeight));
+    active.style.transform = `translateY(${cY - active.offsetTop}px)`;
+    const sibs = [...rl.querySelectorAll(".rank-item:not(.active)")];
+    const next = sibs.find(s => e.clientY <= s.getBoundingClientRect().top + s.offsetHeight/2);
+    if(next !== active.nextSibling) rl.insertBefore(active, next || null);
 });
-rList.addEventListener("pointerup",e=>{
-    if(!active) return; active.classList.remove("active"); active.style.transform=""; active.releasePointerCapture(e.pointerId); active=null;
-});
-
-function submitCustom(){
-    const q=document.getElementById("c-q").value;
-    const opts=[...document.querySelectorAll(".c-opt")].map(i=>i.value).filter(v=>v);
-    if(!q||opts.length<2) return alert("Missing data!");
-    customData={q,opts}; conn.send({type:"CUSTOM_DATA",payload:customData}); round();
-}
+rl.addEventListener("pointerup", e => { if(!active) return; active.classList.remove("active"); active.style.transform = ""; active.releasePointerCapture(e.pointerId); active = null; });
 </script>
 </body>
 </html>

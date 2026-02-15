@@ -2,41 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DuoRanker Multiplayer</title>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <style>
-:root {
-    --p1:#6366f1; --p2:#ec4899; --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --success:#22c55e; --near:#eab308; --wrong:#ef4444;
+:root{
+--p1:#6366f1; --p2:#ec4899; --bg:#0f172a; --card:#1e293b; --text:#f8fafc;
+--success:#22c55e; --near:#eab308;
 }
-body {
-    margin:0; font-family:system-ui; background:var(--bg); color:var(--text);
-    display:flex; justify-content:center; align-items:center; min-height:100vh; padding:1rem;
-}
-.container { max-width:480px; width:100%; background:var(--card); padding:1.5rem; border-radius:24px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.3); }
+body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:center;min-height:100vh;padding:1rem;}
+.container{max-width:480px;width:100%;background:var(--card);padding:1.5rem;border-radius:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);}
 .hidden{display:none;}
-button{width:100%; padding:1rem; border:none; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:8px; transition:0.2s;}
+button{width:100%;padding:1rem;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-top:8px;transition:0.2s;}
 .btn-main{background:var(--p1);color:white;}
 .btn-main:active{transform:scale(0.98);}
 .btn-wait{background:#111827;color:#555;border:1px solid #333;cursor:not-allowed;}
-input,select{width:100%; padding:12px; margin-bottom:10px; border-radius:10px; background:#111827; color:white; border:1px solid #333; box-sizing:border-box; font-size:1rem;}
-#rank-list{position:relative; margin:1.5rem 0; display:flex; flex-direction:column; gap:10px;}
-.rank-item{
-    background:#334155; padding:16px; border-radius:14px; cursor:grab; touch-action:none; text-align:left; user-select:none;
-    display:flex; align-items:center; transition:transform 0.25s cubic-bezier(0.25,0.8,0.25,1), box-shadow 0.25s;
-}
-.rank-item::before{content:"☰"; margin-right:12px; opacity:0.3;}
-.rank-item.active{transform:scale(1.05); box-shadow:0 10px 30px rgba(0,0,0,0.5); cursor:grabbing; z-index:100; background:#475569;}
-.role-badge{font-size:0.75rem; text-transform:uppercase; font-weight:900; letter-spacing:1.5px; margin-bottom:8px;}
-.result-item { display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:12px; margin-bottom:8px; font-weight:600;}
-.result-perfect{background:rgba(34,197,94,0.2); border-left:5px solid var(--success);}
-.result-close{background:rgba(234,179,8,0.2); border-left:5px solid var(--near);}
-.result-wrong{background:rgba(239,68,68,0.2); border-left:5px solid var(--wrong);}
+input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;background:#111827;color:white;border:1px solid #333;box-sizing:border-box;font-size:1rem;}
+#rank-list{position:relative;margin:1.5rem 0;display:flex;flex-direction:column;gap:10px;}
+.rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;transition:transform 0.15s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.15s;}
+.rank-item::before{content:"☰";margin-right:12px;opacity:0.3;}
+.rank-item.active{transform:scale(1.05);box-shadow:0 10px 30px rgba(0,0,0,0.5);background:#475569;cursor:grabbing;z-index:100;transition:none;}
+.role-badge{font-size:0.75rem;text-transform:uppercase;font-weight:900;letter-spacing:1.5px;margin-bottom:8px;}
+.result-item{display:flex;justify-content:space-between;padding:10px;border-radius:12px;margin-bottom:8px;color:#f8fafc;}
+.result-perfect{border-left:5px solid var(--success);background:rgba(34,197,94,0.1);}
+.result-close{border-left:5px solid var(--near);background:rgba(234,179,8,0.1);}
+.result-wrong{border-left:5px solid #64748b;background:rgba(100,116,139,0.1);}
 </style>
 </head>
 <body>
-
 <div class="container">
+
 <div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;">Disconnected</div>
 
 <!-- START SCREEN -->
@@ -75,9 +70,9 @@ input,select{width:100%; padding:12px; margin-bottom:10px; border-radius:10px; b
 
 <!-- RESULTS -->
 <div id="screen-results" class="hidden">
-<p>Results</p>
+<p>Question Results</p>
 <div id="result-list"></div>
-<div id="controls" style="margin-top:10px;"></div>
+<div id="controls" style="margin-top:20px;"></div>
 </div>
 
 <!-- FINAL -->
@@ -89,7 +84,7 @@ input,select{width:100%; padding:12px; margin-bottom:10px; border-radius:10px; b
 </div>
 
 <script>
-const bank = {
+const bank={
 romance:[
 {q:"Ideal First Date?",opts:["Fine Dining","Quiet Coffee","Gaming Arcade","Sunset Picnic","Movie Night"]},
 {q:"Best Gesture?",opts:["Love Letter","Surprise Trip","Home Cooked Meal","Thoughtful Gift","Warm Hug"]},
@@ -105,14 +100,13 @@ personal:[
 ]
 };
 
-let peer, conn;
-let role, idx=0, mode="romance", max=10;
-let truth=null, locked=false, total=0;
+let peer,conn;
+let role,idx=0,mode="romance",max=10;
+let truth=null,locked=false,total=0;
 
 const statusEl=document.getElementById("status");
-
-function setStatus(text,color="#eab308"){statusEl.innerText=text; statusEl.style.color=color;}
-function show(id){document.querySelectorAll(".container>div").forEach(d=>d.classList.add("hidden")); document.getElementById(id).classList.remove("hidden");}
+function setStatus(t,c="#eab308"){statusEl.innerText=t;statusEl.style.color=c;}
+function show(id){document.querySelectorAll(".container>div").forEach(d=>d.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");}
 
 /* HOST */
 function startHost(){
@@ -120,8 +114,12 @@ mode=document.getElementById("mode-select").value;
 max=parseInt(document.getElementById("length-select").value);
 peer=new Peer(Math.floor(1000+Math.random()*9000)+"");
 role="host";
-peer.on("open",id=>{document.getElementById("room-id").innerText=id; show("screen-wait"); setStatus("Waiting for guest...");});
-peer.on("connection",c=>{conn=c; setupConnection();});
+peer.on("open",id=>{
+document.getElementById("room-id").innerText=id;
+show("screen-wait");
+setStatus("Waiting for guest...");
+});
+peer.on("connection",c=>{conn=c;setupConnection();});
 }
 
 /* GUEST */
@@ -143,84 +141,93 @@ conn.on("open",()=>{
 setStatus("Connected ✔","#22c55e");
 if(role==="guest") conn.send({type:"READY"});
 });
-
 conn.on("data",d=>{
-if(d.type==="READY" && role==="host"){ conn.send({type:"START",mode,max}); enterGame(); }
-if(d.type==="START"){ mode=d.mode; max=d.max; enterGame(); }
-if(d.type==="TRUTH"){truth=d.order; ui(); }
-if(d.type==="GUESS"){reveal(truth,d.order); }
-if(d.type==="NEXT"){ idx=d.i; if(idx>=max) final(); else round(); }
+if(d.type==="READY" && role==="host"){conn.send({type:"START",mode,max});enterGame();}
+if(d.type==="START"){mode=d.mode; max=d.max; enterGame();}
+if(d.type==="TRUTH"){truth=d.order;ui();}
+if(d.type==="GUESS"){reveal(truth,d.order);}
+if(d.type==="NEXT"){idx=d.i;if(idx>=max) final(); else round();}
 });
-
-conn.on("close",()=>{setStatus("Disconnected","#ef4444"); alert("Connection lost"); location.reload();});
+conn.on("close",()=>{setStatus("Disconnected","#ef4444");alert("Connection lost");location.reload();});
 conn.on("error",()=>{setStatus("Connection error","#ef4444");});
 }
 
 /* GAME */
-function enterGame(){show("screen-game"); round();}
-function round(){
-truth=null; locked=false;
-const qSet=bank[mode]; const q=qSet[idx%qSet.length];
-document.getElementById("question").innerText=q.q;
-document.getElementById("round").innerText=`Question ${idx+1} of ${max}`;
-render(q.opts); ui();
-}
+function enterGame(){show("screen-game");round();}
+function round(){truth=null;locked=false;const qSet=bank[mode];const q=qSet[idx%qSet.length];document.getElementById("question").innerText=q.q;document.getElementById("round").innerText=`Question ${idx+1} of ${max}`;render(q.opts);ui();}
 
 function ui(){
-const chooser=(idx%2===0 && role==="host") || (idx%2!==0 && role==="guest");
+const chooser=(idx%2===0 && role==="host")||(idx%2!==0 && role==="guest");
 const r=document.getElementById("role");
 const b=document.getElementById("submit");
 r.innerText=chooser?"Setting the Truth":(truth?"Your Turn to Guess":"Partner is choosing...");
 r.style.color=chooser?"var(--p2)":"var(--p1)";
 b.classList.toggle("hidden",!chooser && !truth);
-b.disabled=locked; b.innerText=locked?"Order Locked":"Lock Order";
+b.disabled=locked;
+b.innerText=locked?"Order Locked":"Lock Order";
 }
 
 function sendOrder(){
 const order=[...document.querySelectorAll(".rank-item")].map(x=>x.innerText);
-locked=true; ui();
-if(!truth){truth=order; conn.send({type:"TRUTH",order});}
-else{conn.send({type:"GUESS",order}); reveal(truth,order);}
+locked=true;ui();
+if(!truth){truth=order;conn.send({type:"TRUTH",order});}else{conn.send({type:"GUESS",order});reveal(truth,order);}
 }
 
 function reveal(t,g){
-show("screen-results"); 
+show("screen-results");
 const resultList=document.getElementById("result-list"); resultList.innerHTML="";
 let pts=0;
 t.forEach((x,i)=>{
-const guessedIdx=g.indexOf(x); const diff=Math.abs(i-guessedIdx);
-let div=document.createElement("div"); div.className="result-item";
-if(diff===0){div.classList.add("result-perfect"); pts+=2;}
-else if(diff===1){div.classList.add("result-close"); pts+=1;}
+const guessedIdx=g.indexOf(x);
+const diff=Math.abs(i-guessedIdx);
+let div=document.createElement("div");
+div.className="result-item";
+if(diff===0){ div.classList.add("result-perfect"); pts+=2; }
+else if(diff===1){ div.classList.add("result-close"); pts+=1; }
 else div.classList.add("result-wrong");
 div.innerHTML=`<span>${x}</span><span>Guessed #${guessedIdx+1}</span>`;
 resultList.appendChild(div);
 });
-const s=Math.round((pts/10)*100); total+=s;
-document.getElementById("controls").innerHTML=(role==="host")?`<button class="btn-main" onclick="next()">${idx+1>=max?"Final Results":"Next Round →"}</button>`:`<button class="btn-wait">Waiting for Host...</button>`;
+const s=Math.round((pts/10)*100);
+total+=s;
+
+const controls=document.getElementById("controls"); controls.innerHTML="";
+if(role==="host"){
+const btn=document.createElement("button");
+btn.className="btn-main";
+btn.innerText=idx+1>=max?"Final Results":"Next Round →";
+btn.addEventListener("click",next);
+controls.appendChild(btn);
+}else{
+const btn=document.createElement("button"); btn.className="btn-wait"; btn.innerText="Waiting for Host..."; controls.appendChild(btn);
+}
 }
 
-function next(){ if(role!=="host") return; idx++; conn.send({type:"NEXT",i:idx}); if(idx>=max) final(); else round();}
+function next(){if(role!=="host") return; idx++; conn.send({type:"NEXT",i:idx}); if(idx>=max) final(); else round();}
 function final(){show("screen-final"); document.getElementById("final").innerText=Math.round(total/max)+"%";}
 
 /* DRAG */
-let active=null, startY=0;
+let active=null,startY=0;
 const list=document.getElementById("rank-list");
 list.addEventListener("pointerdown",e=>{
 if(locked) return;
 const item=e.target.closest(".rank-item"); if(!item) return;
-active=item; startY=e.clientY-active.getBoundingClientRect().top; active.classList.add("active"); active.setPointerCapture(e.pointerId);
+active=item; startY=e.clientY - active.getBoundingClientRect().top;
+active.classList.add("active"); active.setPointerCapture(e.pointerId);
 });
 list.addEventListener("pointermove",e=>{
 if(!active) return;
 const listRect=list.getBoundingClientRect();
-const constrainedY=Math.max(0,Math.min(e.clientY-listRect.top-startY, listRect.height-active.offsetHeight));
+const constrainedY=Math.max(0,Math.min(e.clientY - listRect.top - startY,listRect.height-active.offsetHeight));
 active.style.transform=`translateY(${constrainedY-active.offsetTop}px)`;
 const siblings=[...list.querySelectorAll(".rank-item:not(.active)")];
 const nextSibling=siblings.find(s=>e.clientY<=s.getBoundingClientRect().top+s.offsetHeight/2);
 if(nextSibling!==active.nextSibling) list.insertBefore(active,nextSibling||null);
 });
-list.addEventListener("pointerup",e=>{if(!active) return; active.classList.remove("active"); active.style.transform=""; active.releasePointerCapture(e.pointerId); active=null;});
+list.addEventListener("pointerup",e=>{
+if(!active) return;
+active.classList.remove("active"); active.style.transform=""; active.releasePointerCapture(e.pointerId); active=null;
+});
 
 function render(opts){
 list.innerHTML="";

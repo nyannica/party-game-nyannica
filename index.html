@@ -10,13 +10,13 @@
 body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;justify-content:center;align-items:center;min-height:100vh;padding:1rem;overflow:hidden;}
 .container{max-width:480px;width:100%;background:var(--card);padding:1.5rem;border-radius:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto;}
 .hidden{display:none !important;}
-button{width:100%;padding:1rem;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-top:8px;transition:0.2s;}
+button{width:100%;padding:1.2rem;border:none;border-radius:12px;font-weight:bold;cursor:pointer;margin-top:8px;transition:0.2s;font-size:1rem;}
 .btn-main{background:var(--p1);color:white;}
-.btn-main:active{transform:scale(0.98);}
-.btn-wait{background:#111827;color:#555;border:1px solid #333;cursor:not-allowed;}
+.btn-main:active{transform:scale(0.95);}
+.btn-wait{background:#111827;color:#666;border:1px solid #333;cursor:wait;}
 input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;background:#111827;color:white;border:1px solid #333;box-sizing:border-box;font-size:1rem;}
 #rank-list{position:relative;margin:1.5rem 0;display:flex;flex-direction:column;gap:10px;}
-.rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;}
+.rank-item{background:#334155;padding:16px;border-radius:14px;cursor:grab;touch-action:none;text-align:left;user-select:none;display:flex;align-items:center;border:1px solid rgba(255,255,255,0.05);}
 .rank-item::before{content:"☰";margin-right:12px;opacity:0.3;}
 .rank-item.active{transform:scale(1.05);box-shadow:0 10px 30px rgba(0,0,0,0.5);background:#475569;z-index:100;}
 .result-item{display:flex;justify-content:space-between;padding:12px;border-radius:12px;margin-bottom:8px;font-size:0.9rem;}
@@ -27,7 +27,7 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
 </head>
 <body>
 <div class="container">
-<div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;">Disconnected</div>
+<div id="status" style="font-size:.7rem;color:var(--near);margin-bottom:10px;opacity:.7;transition:0.3s;">Connecting to Network...</div>
 
 <div id="screen-start" class="game-screen">
     <h1>DuoRanker</h1>
@@ -60,7 +60,7 @@ input,select{width:100%;padding:12px;margin-bottom:10px;border-radius:10px;backg
 </div>
 
 <div id="screen-final" class="game-screen hidden">
-    <p>Overall Score</p>
+    <p>Overall Compatibility</p>
     <h1 id="final" style="font-size:6rem;color:var(--p1); margin:0;">0%</h1>
     <button class="btn-main" onclick="location.reload()" style="margin-top:20px;">New Game</button>
 </div>
@@ -83,10 +83,12 @@ const bank={
 
 let peer, conn, role, idx=0, mode="romance", max=5, truth=null, locked=false, total=0;
 
+// HELPER: FORCE UI CHANGE
 function show(screenId){
     const screens = document.querySelectorAll(".game-screen");
     screens.forEach(s => s.classList.add("hidden"));
-    document.getElementById(screenId).classList.remove("hidden");
+    const active = document.getElementById(screenId);
+    if(active) active.classList.remove("hidden");
 }
 
 function startHost(){
@@ -94,7 +96,7 @@ function startHost(){
     max=parseInt(document.getElementById("length-select").value);
     peer=new Peer(Math.floor(1000+Math.random()*9000)+"");
     role="host";
-    peer.on("open",id=>{ document.getElementById("room-id").innerText=id; show("screen-wait"); });
+    peer.on("open",id=>{ document.getElementById("room-id").innerText=id; show("screen-wait"); document.getElementById("status").innerText="Waiting..."; });
     peer.on("connection",c=>{conn=c; setupConnection();});
 }
 
@@ -109,17 +111,29 @@ function startJoin(){
 
 function setupConnection(){
     conn.on("open",()=>{
-        document.getElementById("status").innerText="Connected ✔";
+        document.getElementById("status").innerText="Online ✔";
         if(role==="guest") conn.send({type:"READY"});
     });
+    
     conn.on("data",d=>{
+        // Visual debug flash
+        const s = document.getElementById("status");
+        s.style.background = "#22c55e33";
+        setTimeout(()=>s.style.background="transparent", 200);
+
         if(d.type==="READY" && role==="host"){ conn.send({type:"START",mode,max}); enterGame(); }
         if(d.type==="START"){ mode=d.mode; max=d.max; enterGame(); }
         if(d.type==="TRUTH"){ truth=d.order; ui(); }
         if(d.type==="GUESS"){ reveal(truth, d.order); }
+        
+        // CRITICAL: Next Round Sync
         if(d.type==="NEXT"){ 
             idx = d.i; 
-            if(idx >= max) showFinal(); else round(); 
+            if(idx >= max) {
+                showFinal(); 
+            } else {
+                round(); // This resets variables and calls show("screen-game")
+            }
         }
     });
 }
@@ -134,7 +148,7 @@ function round(){
     document.getElementById("round").innerText=`Question ${idx+1} of ${max}`;
     render(q.opts); 
     ui(); 
-    show("screen-game"); // Force screen switch
+    show("screen-game"); // Forces Guest to switch from Results to Game
 }
 
 function ui(){
@@ -145,7 +159,7 @@ function ui(){
     r.style.color=chooser?"var(--p2)":"var(--p1)";
     b.classList.toggle("hidden",!chooser && !truth);
     b.disabled=locked; 
-    b.innerText=locked?"Locked":"Lock Order";
+    b.innerText=locked?"Order Locked":"Lock My Order";
 }
 
 function sendOrder(){
@@ -176,8 +190,13 @@ function reveal(t,g){
     const btn=document.createElement("button");
     if(role==="host"){
         btn.className="btn-main"; 
-        btn.innerText=idx+1>=max?"Final Results":"Next Round →";
-        btn.onclick=handleNext; 
+        btn.innerText=idx+1>=max?"View Final Results":"Next Round →";
+        btn.onclick = () => {
+            idx++;
+            // We explicitly send the command before switching local UI
+            conn.send({type:"NEXT", i:idx});
+            if(idx >= max) showFinal(); else round();
+        };
     } else {
         btn.className="btn-wait"; 
         btn.innerText="Waiting for Host..."; 
@@ -187,19 +206,12 @@ function reveal(t,g){
     show("screen-results");
 }
 
-function handleNext(){
-    if(role !== "host") return;
-    idx++;
-    conn.send({type:"NEXT", i:idx});
-    if(idx >= max) showFinal(); else round();
-}
-
 function showFinal(){ 
     show("screen-final"); 
     document.getElementById("final").innerText=Math.round(total/max)+"%"; 
 }
 
-// Drag Logic
+// DRAG LOGIC
 let active=null,startY=0;
 const rList=document.getElementById("rank-list");
 rList.addEventListener("pointerdown",e=>{

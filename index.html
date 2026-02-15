@@ -25,6 +25,7 @@
         #live-points { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-around; font-weight: bold; border: 1px solid #475569; font-size: 0.8rem; }
         .result-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #334155; font-size: 0.9rem; }
         #steal-timer { font-size: 0.7rem; margin-top: 5px; color: var(--p2); font-weight: bold; }
+        .winner-banner { font-size: 2rem; margin: 20px 0; color: var(--near); text-shadow: 0 0 10px rgba(234, 179, 8, 0.3); }
     </style>
 </head>
 <body>
@@ -72,10 +73,17 @@
     </div>
 
     <div id="screen-results" class="hidden">
-        <h2 id="res-score">Result</h2>
+        <h2 id="res-title">Round Result</h2>
         <div id="result-list" style="margin: 15px 0;"></div>
         <div id="controls"></div>
         <div id="steal-timer"></div>
+    </div>
+
+    <div id="screen-final" class="hidden">
+        <h1>Game Over!</h1>
+        <div class="winner-banner" id="winner-text"></div>
+        <div id="final-stats" style="margin-bottom: 20px;"></div>
+        <button class="btn-main" onclick="location.reload()">Play Again</button>
     </div>
 </div>
 
@@ -139,7 +147,7 @@ function setup() {
         if(d.type === "START") { mode = d.mode; max = d.max; deck = d.deck; round(); }
         if(d.type === "TRUTH") { truth = d.order; ui(); render(deck[idx].opts, false); }
         if(d.type === "GUESS") { reveal(truth, d.order); }
-        if(d.type === "NEXT") { idx = d.i; (idx >= max) ? location.reload() : round(); }
+        if(d.type === "NEXT") { idx = d.i; (idx >= max) ? showFinalScore() : round(); }
         if(d.type === "SYNC_SCORE") { scores = d.scores; updatePoints(); }
         if(d.type === "STEAL") { 
             clearInterval(stealInterval);
@@ -181,7 +189,6 @@ function ui() {
     tag.innerText = isCr ? "⭐ SET YOUR TRUTH" : (truth ? "🔍 GUESS THEIR TRUTH" : "⌛ PREVIEWING OPTIONS...");
     tag.style.color = isCr ? "var(--p2)" : "var(--p1)";
     document.getElementById("submit").classList.toggle("hidden", !isCr && !truth);
-    // Only allow the current active player to trigger a skip to avoid confusion
     document.getElementById("skip-btn").classList.toggle("hidden", !isCr && !truth);
 }
 
@@ -196,7 +203,7 @@ function render(opts, isPreview) {
 }
 
 function requestSkip() {
-    if(confirm("Skip this question and move to the next round? No points will be awarded.")) {
+    if(confirm("Skip this question? No points awarded.")) {
         conn.send({ type: "SKIP" });
         handleSkip();
     }
@@ -206,9 +213,8 @@ function handleSkip() {
     if(role === "host") {
         idx++;
         conn.send({type: "NEXT", i: idx});
-        (idx >= max) ? location.reload() : round();
+        (idx >= max) ? showFinalScore() : round();
     } else {
-        // Guest waits for Host to send the NEXT signal
         document.getElementById("status").innerText = "Skipping...";
     }
 }
@@ -261,29 +267,40 @@ function reveal(t, g) {
 
         stealInterval = setInterval(() => {
             timeLeft--;
-            if(timeLeft > 0) {
-                b.innerText = `🔄 Steal Turn (${timeLeft}s)`;
-            } else {
-                b.disabled = true;
-                b.innerText = "Time Expired";
-                clearInterval(stealInterval);
-            }
+            if(timeLeft > 0) b.innerText = `🔄 Steal Turn (${timeLeft}s)`;
+            else { b.disabled = true; b.innerText = "Time Expired"; clearInterval(stealInterval); }
         }, 1000);
     }
 
     if(role === "host") {
         let bNext = document.createElement("button"); 
         bNext.className="btn-main"; 
-        bNext.innerText=(idx+1 >= max) ? "Final Scoreboard" : "Next Round";
+        bNext.innerText=(idx+1 >= max) ? "See Final Winner" : "Next Round";
         bNext.onclick = () => { 
             clearInterval(stealInterval);
             idx++; 
             conn.send({type:"NEXT", i:idx}); 
-            (idx >= max) ? location.reload() : round(); 
+            (idx >= max) ? showFinalScore() : round(); 
         };
         ctrl.appendChild(bNext);
     }
     show("screen-results");
+}
+
+function showFinalScore() {
+    const winnerText = document.getElementById("winner-text");
+    const stats = document.getElementById("final-stats");
+    
+    let winner = "";
+    if(scores.host > scores.guest) winner = "HOST WINS! 🏆";
+    else if(scores.guest > scores.host) winner = "GUEST WINS! 🏆";
+    else winner = "IT'S A TIE! 🤝";
+    
+    winnerText.innerText = winner;
+    stats.innerHTML = `<p>Host: ${scores.host} pts</p><p>Guest: ${scores.guest} pts</p>`;
+    
+    document.getElementById("live-points").classList.add("hidden");
+    show("screen-final");
 }
 
 let active = null;

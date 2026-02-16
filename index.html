@@ -29,11 +29,10 @@
             align-items:center; 
             min-height:100vh; 
             padding:1rem; 
-            overflow:hidden; 
+            overflow:hidden;
             touch-action: none; 
         }
 
-        /* Floating Hearts Background Effect */
         body::before {
             content: "♥";
             position: fixed;
@@ -52,7 +51,7 @@
         }
 
         .container { 
-            max-width:480px; 
+            max-width:480px;
             width:100%; 
             background:var(--card); 
             padding:2rem; 
@@ -62,15 +61,14 @@
             border: 1px solid rgba(190, 18, 60, 0.3);
             max-height:95vh; 
             overflow-y:auto; 
-            position: relative; 
+            position: relative;
         }
 
         h1 { font-style: italic; color: var(--accent); text-shadow: 0 0 10px rgba(244, 63, 94, 0.5); }
-
         .hidden { display:none !important; }
 
         button { 
-            width:100%; 
+            width:100%;
             padding:1.1rem; 
             border:none; 
             border-radius:100px; 
@@ -93,7 +91,7 @@
         .btn-skip { background: transparent; color: var(--skip); border: 1px solid var(--skip); font-size: 0.7rem; margin-top: 20px; }
 
         input, select { 
-            width:100%; 
+            width:100%;
             padding:14px; 
             margin-bottom:12px; 
             border-radius:15px; 
@@ -101,13 +99,13 @@
             color:var(--accent); 
             border:1px solid #4c0519; 
             box-sizing:border-box; 
-            font-size:1rem; 
+            font-size:1rem;
         }
 
         #rank-list { margin:1.5rem 0; display:flex; flex-direction:column; gap:10px; }
         
         .rank-item { 
-            background: rgba(76, 5, 25, 0.3); 
+            background: rgba(76, 5, 25, 0.3);
             padding:16px; 
             border-radius:15px; 
             cursor:grab; 
@@ -126,7 +124,7 @@
         .rank-preview { opacity: 0.4; cursor: default; pointer-events: none; border: 1px dashed var(--p1); }
         
         #live-points { 
-            background: rgba(0,0,0,0.5); 
+            background: rgba(0,0,0,0.5);
             padding: 12px; 
             border-radius: 50px; 
             margin-bottom: 20px; 
@@ -138,7 +136,7 @@
         }
 
         .result-row { 
-            display: flex; 
+            display: flex;
             justify-content: space-between; 
             padding: 12px; 
             border-bottom: 1px solid rgba(190, 18, 60, 0.1); 
@@ -147,10 +145,10 @@
 
         #steal-timer { font-size: 0.75rem; margin-top: 10px; color: var(--accent); font-style: italic; }
         .winner-banner { 
-            font-size: 2.2rem; 
+            font-size: 2.2rem;
             margin: 20px 0; 
             color: var(--accent); 
-            text-shadow: 0 0 20px var(--p1); 
+            text-shadow: 0 0 20px var(--p1);
         }
         #status { font-size:0.6rem; color:var(--p1); margin-bottom:5px; text-transform:uppercase; font-weight: bold; letter-spacing: 1px;}
     </style>
@@ -167,13 +165,14 @@
 
     <div id="screen-start">
         <h1>DuoRanker: <i>Soulmates</i></h1>
-        <select id="mode-select">
+        <select id="mode-select" onchange="toggleCustomBtn()">
             <option value="romance">Romance 💖</option>
             <option value="personal">Compatibility 🏹</option>
             <option value="gaming">Video Games 🎮</option>
             <option value="travel">Travel & Adventure ✈️</option>
             <option value="career">Career & Ambition 💼</option>
             <option value="chaos">🔥 CHAOS MODE</option>
+            <option value="custom">✍️ CUSTOM QUESTIONS</option>
         </select>
         <select id="round-select">
             <option value="5">Blitz (5 Rounds)</option>
@@ -183,6 +182,20 @@
         <button id="host-btn" class="btn-main" onclick="startHost()" disabled>Loading Bank...</button>
         <input id="join-id" placeholder="Partner Code" type="tel" style="margin-top:15px;">
         <button class="btn-outline" onclick="startJoin()">Join Game</button>
+    </div>
+
+    <div id="screen-custom" class="hidden">
+        <h1>Create Your Question</h1>
+        <input id="custom-q" placeholder="Enter your question...">
+        <div id="custom-opts">
+            <input class="custom-opt" placeholder="Option 1">
+            <input class="custom-opt" placeholder="Option 2">
+            <input class="custom-opt" placeholder="Option 3">
+            <input class="custom-opt" placeholder="Option 4">
+            <input class="custom-opt" placeholder="Option 5">
+        </div>
+        <button class="btn-main" onclick="saveCustomAndHost()">Start Custom Game</button>
+        <button class="btn-outline" onclick="show('screen-start')">Back</button>
     </div>
 
     <div id="screen-wait" class="hidden">
@@ -210,7 +223,8 @@
         <h1>Fate Decided</h1>
         <div class="winner-banner" id="winner-text"></div>
         <div id="final-stats" style="margin-bottom: 20px;"></div>
-        <button class="btn-main" onclick="location.reload()">Play Again</button>
+        <div id="post-game-controls"></div>
+        <button class="btn-outline" style="margin-top:20px" onclick="location.reload()">Exit to Menu</button>
     </div>
 </div>
 
@@ -244,16 +258,45 @@ function shuffle(array) {
 
 function show(id) { 
     document.querySelectorAll(".container > div:not(#status):not(#live-points)").forEach(d => d.classList.add("hidden")); 
-    document.getElementById(id).classList.remove("hidden"); 
+    document.getElementById(id).classList.remove("hidden");
+}
+
+function toggleCustomBtn() {
+    const modeVal = document.getElementById("mode-select").value;
+    const hostBtn = document.getElementById("host-btn");
+    hostBtn.innerText = (modeVal === "custom") ? "Design Question" : "Host Connection";
 }
 
 function startHost() {
     if(!bank) return;
     mode = document.getElementById("mode-select").value;
+    
+    if(mode === "custom") {
+        show("screen-custom");
+        return;
+    }
+
     max = parseInt(document.getElementById("round-select").value);
     let pool = (mode === 'chaos') ? [].concat(...Object.values(bank)) : [...bank[mode]];
     deck = shuffle(pool).slice(0, max);
-    peer = new Peer(Math.floor(1000 + Math.random() * 9000) + ""); role = "host";
+    initPeer();
+}
+
+function saveCustomAndHost() {
+    const q = document.getElementById("custom-q").value;
+    const optInputs = document.querySelectorAll(".custom-opt");
+    const opts = Array.from(optInputs).map(i => i.value).filter(v => v.trim() !== "");
+    
+    if(!q || opts.length < 2) return alert("Please enter a question and at least 2 options!");
+    
+    deck = [{ q, opts }];
+    max = 1; 
+    initPeer();
+}
+
+function initPeer() {
+    peer = new Peer(Math.floor(1000 + Math.random() * 9000) + ""); 
+    role = "host";
     peer.on("open", id => { document.getElementById("room-id").innerText = id; show("screen-wait"); });
     peer.on("connection", c => { conn = c; setup(); });
 }
@@ -357,18 +400,18 @@ function sendOrder() {
     const order = [...document.querySelectorAll(".rank-item")].map(x => x.innerText);
     locked = true; 
     if(!truth) { 
-        truth = order; 
+        truth = order;
         conn.send({ type: "TRUTH", order }); 
     }
     else { 
-        conn.send({ type: "GUESS", order }); 
+        conn.send({ type: "GUESS", order });
         reveal(truth, order); 
     }
 }
 
 function reveal(t, g) {
     clearInterval(stealInterval);
-    const list = document.getElementById("result-list"); list.innerHTML = ""; 
+    const list = document.getElementById("result-list"); list.innerHTML = "";
     let pts = 0;
     t.forEach((x, i) => {
         const actualPos = g.indexOf(x); const diff = Math.abs(i - actualPos);
@@ -377,10 +420,9 @@ function reveal(t, g) {
         div.innerHTML = `<span>${x}</span><span style="color:${diff===0?'var(--success)':'var(--text)'}">Rank #${actualPos+1}</span>`;
         list.appendChild(div);
     });
-    
     if(role === "host") { 
         scores[(currentDesigner==='host'?'guest':'host')] += pts; 
-        conn.send({ type: "SYNC_SCORE", scores }); 
+        conn.send({ type: "SYNC_SCORE", scores });
         updatePoints(); 
     }
     
@@ -395,7 +437,6 @@ function reveal(t, g) {
         b.innerText=`🔄 Steal Turn (${timeLeft}s)`;
         b.onclick = () => { conn.send({type:"STEAL"}); currentDesigner=role; replay(); };
         ctrl.appendChild(b);
-
         stealInterval = setInterval(() => {
             timeLeft--;
             if(timeLeft > 0) b.innerText = `🔄 Steal Turn (${timeLeft}s)`;
@@ -405,11 +446,11 @@ function reveal(t, g) {
 
     if(role === "host") {
         let bNext = document.createElement("button"); 
-        bNext.className="btn-main"; 
+        bNext.className="btn-main";
         bNext.innerText=(idx+1 >= max) ? "Reveal the Bond" : "Next Round";
         bNext.onclick = () => { 
             clearInterval(stealInterval);
-            idx++; 
+            idx++;
             conn.send({type:"NEXT", i:idx}); 
             (idx >= max) ? showFinalScore() : round(); 
         };
@@ -421,6 +462,8 @@ function reveal(t, g) {
 function showFinalScore() {
     const winnerText = document.getElementById("winner-text");
     const stats = document.getElementById("final-stats");
+    const controls = document.getElementById("post-game-controls");
+    controls.innerHTML = "";
     
     let winner = "";
     if(scores.host > scores.guest) winner = "HOST REIGNS 🥀";
@@ -432,6 +475,34 @@ function showFinalScore() {
     
     document.getElementById("live-points").classList.add("hidden");
     show("screen-final");
+
+    if (role === "host") {
+        let btnNext = document.createElement("button");
+        btnNext.className = "btn-main";
+        btnNext.innerText = "Next Round (Same Mode)";
+        btnNext.onclick = () => {
+            idx = 0;
+            let pool = (mode === 'chaos') ? [].concat(...Object.values(bank)) : [...bank[mode]];
+            deck = shuffle(pool).slice(0, max);
+            conn.send({ type: "START", mode, max, deck });
+            round();
+        };
+        controls.appendChild(btnNext);
+
+        let btnSwap = document.createElement("button");
+        btnSwap.className = "btn-alt";
+        btnSwap.innerText = "Give Guest Turn 1";
+        btnSwap.onclick = () => {
+            idx = 1; 
+            let pool = (mode === 'chaos') ? [].concat(...Object.values(bank)) : [...bank[mode]];
+            deck = shuffle(pool).slice(0, max);
+            conn.send({ type: "START", mode, max, deck });
+            round();
+        };
+        controls.appendChild(btnSwap);
+    } else {
+        controls.innerHTML = "<p style='font-size:0.8rem; opacity:0.6;'>Waiting for Host...</p>";
+    }
 }
 
 // DRAG AND DROP LOGIC
